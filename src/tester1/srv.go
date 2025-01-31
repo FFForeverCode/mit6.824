@@ -1,17 +1,16 @@
 package tester
 
 import (
-	//"log"
-	"sync"
+	// "log"
 
 	"6.5840/labrpc"
+	"6.5840/raft"
 )
 
 type Server struct {
-	mu       sync.Mutex
 	net      *labrpc.Network
-	saved    *Persister
-	svcs     []IService // list of services exported by
+	saved    *raft.Persister
+	kvsrv    IKVServer
 	endNames []string
 	clntEnds []*labrpc.ClientEnd
 }
@@ -41,28 +40,19 @@ func (s *Server) startServer(gid Tgid) *Server {
 	if s.saved != nil {
 		srv.saved = s.saved.Copy()
 	} else {
-		srv.saved = MakePersister()
+		srv.saved = raft.MakePersister()
 	}
 	return srv
 }
 
-// connect s to servers listed in to
-func (s *Server) connect(sg *ServerGrp, to []int) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (s *Server) connect(to []int) {
 	for j := 0; j < len(to); j++ {
-		if sg.IsConnected(to[j]) {
-			//log.Printf("connect %d to %d (%v)", s.id, to[j], s.endNames[to[j]])
-			endname := s.endNames[to[j]]
-			s.net.Enable(endname, true)
-		}
+		endname := s.endNames[to[j]]
+		s.net.Enable(endname, true)
 	}
 }
 
 func (s *Server) disconnect(from []int) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if s.endNames == nil {
 		return
 	}
@@ -72,10 +62,8 @@ func (s *Server) disconnect(from []int) {
 	}
 }
 
+// XXX lock s?
 func (s *Server) shutdownServer() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	// a fresh persister, in case old instance
 	// continues to update the Persister.
 	// but copy old persister's content so that we always
@@ -84,11 +72,9 @@ func (s *Server) shutdownServer() {
 		s.saved = s.saved.Copy()
 	}
 
-	// inform all services to stop
-	for _, svc := range s.svcs {
-		if svc != nil {
-			svc.Kill()
-		}
+	kv := s.kvsrv
+	if kv != nil {
+		kv.Kill()
+		s.kvsrv = nil
 	}
-	s.svcs = nil
 }

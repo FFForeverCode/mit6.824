@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"6.5840/kvtest1"
-	"6.5840/labrpc"
 	"6.5840/tester1"
 )
 
@@ -23,6 +22,7 @@ type Test struct {
 const Gid = tester.GRP0
 
 func MakeTest(t *testing.T, part string, nclients, nservers int, reliable bool, crash bool, partitions bool, maxraftstate int, randomkeys bool) *Test {
+	cfg := tester.MakeConfig(t, nservers, reliable, maxraftstate, StartKVServer)
 	ts := &Test{
 		t:            t,
 		part:         part,
@@ -33,15 +33,9 @@ func MakeTest(t *testing.T, part string, nclients, nservers int, reliable bool, 
 		maxraftstate: maxraftstate,
 		randomkeys:   randomkeys,
 	}
-	cfg := tester.MakeConfig(t, nservers, reliable, ts.StartKVServer)
 	ts.Test = kvtest.MakeTest(t, cfg, randomkeys, ts)
 	ts.Begin(ts.makeTitle())
 	return ts
-}
-
-func (ts *Test) StartKVServer(servers []*labrpc.ClientEnd, gid tester.Tgid, me int, persister *tester.Persister) []tester.IService {
-	return StartKVServer(servers, gid, me, persister, ts.maxraftstate)
-
 }
 
 func (ts *Test) MakeClerk() kvtest.IKVClerk {
@@ -87,6 +81,6 @@ func (ts *Test) makeTitle() string {
 	} else {
 		title = title + "one client"
 	}
-	title = title + " (" + ts.part + ")" // 4A, 4B, 4C
+	title = title + " (" + ts.part + ")" // 4A or 4B
 	return title
 }

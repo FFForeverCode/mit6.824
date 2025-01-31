@@ -4,21 +4,26 @@ import (
 	crand "crypto/rand"
 	"encoding/base64"
 	"fmt"
-	//"log"
+	// "log"
 	"math/big"
 	"math/rand"
 	"runtime"
-	// "runtime/debug"
-	"strings"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"6.5840/labrpc"
+	"6.5840/raft"
 )
 
 const GRP0 = 0
+
+type IKVServer interface {
+	Raft() *raft.Raft
+	Kill()
+}
 
 type Config struct {
 	*Clnts  // The clnts in the test
@@ -34,7 +39,7 @@ type Config struct {
 	ops   int32     // number of clerk get/put/append method calls
 }
 
-func MakeConfig(t *testing.T, n int, reliable bool, mks FstartServer) *Config {
+func MakeConfig(t *testing.T, n int, reliable bool, maxraftstate int, mks FstartServer) *Config {
 	ncpu_once.Do(func() {
 		if runtime.NumCPU() < 2 {
 			fmt.Printf("warning: only one CPU, which may conceal locking bugs\n")
@@ -46,7 +51,7 @@ func MakeConfig(t *testing.T, n int, reliable bool, mks FstartServer) *Config {
 	cfg.t = t
 	cfg.net = labrpc.MakeNetwork()
 	cfg.Groups = newGroups(cfg.net)
-	cfg.MakeGroupStart(GRP0, n, mks)
+	cfg.MakeGroupStart(GRP0, n, maxraftstate, mks)
 	cfg.Clnts = makeClnts(cfg.net)
 	cfg.start = time.Now()
 
@@ -79,16 +84,11 @@ func (cfg *Config) Cleanup() {
 	cfg.Clnts.cleanup()
 	cfg.Groups.cleanup()
 	cfg.net.Cleanup()
-	if cfg.t.Failed() {
-		annotation.cleanup(true, "test failed")
-	} else {
-		annotation.cleanup(false, "test passed")
-	}
 	cfg.CheckTimeout()
 }
 
-func (cfg *Config) MakeGroupStart(gid Tgid, nsrv int, mks FstartServer) {
-	cfg.MakeGroup(gid, nsrv, mks)
+func (cfg *Config) MakeGroupStart(gid Tgid, nsrv, maxraftstate int, mks FstartServer) {
+	cfg.MakeGroup(gid, nsrv, maxraftstate, mks)
 	cfg.Group(gid).StartServers()
 }
 
@@ -138,32 +138,13 @@ func (cfg *Config) End() {
 		ops := atomic.LoadInt32(&cfg.ops)  //  number of clerk get/put/append calls
 
 		fmt.Printf("  ... Passed --")
-		fmt.Printf("  time %4.1fs #peers %d #RPCs %5d #Ops %4d\n", t, npeers, nrpc, ops)
+		fmt.Printf("  %4.1f  %d %5d %4d\n", t, npeers, nrpc, ops)
 	}
 }
 
 func (cfg *Config) Fatalf(format string, args ...any) {
-	const maxStackLen = 50
-	fmt.Printf("Fatal: ")
-	fmt.Printf(format, args...)
-	fmt.Println("")
-	var pc [maxStackLen]uintptr
-	// Skip two extra frames to account for this function
-	// and runtime.Callers itself.
-	n := runtime.Callers(2, pc[:])
-	if n == 0 {
-		panic("testing: zero callers found")
-	}
-	frames := runtime.CallersFrames(pc[:n])
-	var frame runtime.Frame
-	for more := true; more; {
-		frame, more = frames.Next()
-		// Print only frames in our test files
-		if strings.Contains(frame.File, "test.go") {
-			fmt.Printf("        %v:%d\n", frame.File, frame.Line)
-		}
-	}
-	cfg.t.FailNow()
+	debug.PrintStack()
+	cfg.t.Fatalf(format, args...)
 }
 
 func Randstring(n int) string {

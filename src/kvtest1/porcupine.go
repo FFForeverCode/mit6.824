@@ -2,7 +2,8 @@ package kvtest
 
 import (
 	"fmt"
-	"os"
+	"io/ioutil"
+	//"log"
 	"sync"
 	"testing"
 	"time"
@@ -45,7 +46,7 @@ func (log *OpLog) Read() []porcupine.Operation {
 // absolute timestamps with `time.Now().UnixNano()` (which uses the wall
 // clock), we measure time relative to `t0` using `time.Since(t0)`, which uses
 // the monotonic clock
-var t0 = time.Unix(0, 0)
+var t0 = time.Now()
 
 func Get(cfg *tester.Config, ck IKVClerk, key string, log *OpLog, cli int) (string, rpc.Tversion, rpc.Err) {
 	start := int64(time.Since(t0))
@@ -84,24 +85,13 @@ func Put(cfg *tester.Config, ck IKVClerk, key string, value string, version rpc.
 // Checks that the log of Clerk.Put's and Clerk.Get's is linearizable (see
 // linearizability-faq.txt)
 func checkPorcupine(t *testing.T, opLog *OpLog, nsec time.Duration) {
-	enabled := os.Getenv("VIS_ENABLE")
-	fpath := os.Getenv("VIS_FILE")
+	//log.Printf("oplog len %v %v", ts.oplog.Len(), ts.oplog)
 	res, info := porcupine.CheckOperationsVerbose(models.KvModel, opLog.Read(), nsec)
 	if res == porcupine.Illegal {
-		var file *os.File
-		var err error
-		if fpath == "" {
-			// Save the vis file in a temporary file.
-			file, err = os.CreateTemp("", "porcupine-*.html")
-		} else {
-			file, err = os.OpenFile(fpath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
-		}
+		file, err := ioutil.TempFile("", "porcupine-*.html")
 		if err != nil {
-			fmt.Printf("info: failed to open visualization file %s (%v)\n", fpath, err)
-		} else if enabled != "never" {
-			// Don't produce visualization file if VIS_ENABLE is set to "never".
-			annotations := tester.FinalizeAnnotations("test failed")
-			info.AddAnnotations(annotations)
+			fmt.Printf("info: failed to create temp file for visualization")
+		} else {
 			err = porcupine.Visualize(models.KvModel, info, file)
 			if err != nil {
 				fmt.Printf("info: failed to write history visualization to %s\n", file.Name())
@@ -112,30 +102,6 @@ func checkPorcupine(t *testing.T, opLog *OpLog, nsec time.Duration) {
 		t.Fatal("history is not linearizable")
 	} else if res == porcupine.Unknown {
 		fmt.Println("info: linearizability check timed out, assuming history is ok")
-	}
-
-	// The result is either legal or unknown.
-	if enabled == "always" && tester.GetAnnotationFinalized() {
-		var file *os.File
-		var err error
-		if fpath == "" {
-			// Save the vis file in a temporary file.
-			file, err = os.CreateTemp("", "porcupine-*.html")
-		} else {
-			file, err = os.OpenFile(fpath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
-		}
-		if err != nil {
-			fmt.Printf("info: failed to open visualization file %s (%v)\n", fpath, err)
-			return
-		}
-		annotations := tester.FinalizeAnnotations("test passed")
-		info.AddAnnotations(annotations)
-		err = porcupine.Visualize(models.KvModel, info, file)
-		if err != nil {
-			fmt.Printf("info: failed to write history visualization to %s\n", file.Name())
-		} else {
-			fmt.Printf("info: wrote history visualization to %s\n", file.Name())
-		}
 	}
 }
 
@@ -176,12 +142,9 @@ func (ts *Test) Put(ck IKVClerk, key string, value string, version rpc.Tversion,
 }
 
 func (ts *Test) CheckPorcupine() {
-	ts.CheckPorcupineT(linearizabilityCheckTimeout)
+	checkPorcupine(ts.t, ts.oplog, linearizabilityCheckTimeout)
 }
 
 func (ts *Test) CheckPorcupineT(nsec time.Duration) {
-	// tester.RetrieveAnnotations() also clears the accumulated annotations so
-	// that the vis file containing client operations (generated here) won't be
-	// overridden by that without client operations (generated at cleanup time).
 	checkPorcupine(ts.t, ts.oplog, nsec)
 }

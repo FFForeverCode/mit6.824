@@ -1,214 +1,48 @@
 package mr
 
-import (
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"regexp"
-	"sort"
-	"time"
-)
+import "fmt"
 import "log"
 import "net/rpc"
 import "hash/fnv"
 
+
+//
 // Map functions return a slice of KeyValue.
+//
 type KeyValue struct {
 	Key   string
 	Value string
 }
-type ByKey []KeyValue
 
-// for sorting by key.
-func (a ByKey) Len() int           { return len(a) }
-func (a ByKey) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ByKey) Less(i, j int) bool { return a[i].Key < a[j].Key }
-
+//
 // use ihash(key) % NReduce to choose the reduce
 // task number for each KeyValue emitted by Map.
+//
 func ihash(key string) int {
 	h := fnv.New32a()
 	h.Write([]byte(key))
 	return int(h.Sum32() & 0x7fffffff)
 }
 
+
+//
 // main/mrworker.go calls this function.
+//
 func Worker(mapf func(string, string) []KeyValue,
 	reducef func(string, []string) string) {
 
 	// Your worker implementation here.
-	for isNotDone() {
-		success, task, hasIdleTask := getTaskWithStatus(IDLE)
-		if !success {
-			continue
-		}
-		if !hasIdleTask {
-			continue
-		}
-		if task.IsMap {
-			doMap(mapf, task)
-		} else {
-			doReduce(reducef, task)
-		}
-		time.Sleep(200)
-	}
+
 	// uncomment to send the Example RPC to the coordinator.
 	// CallExample()
 
 }
 
-func doReduce(reducef func(string, []string) string, task *Task) {
-	contentKvs := readReduceTaskInputParam(task)
-	outputFilename := task.GetReduceOutputFilePath()
-	sort.Sort(ByKey(contentKvs))
-	kvSliceMap := aggregateKvs(contentKvs)
-	for k, vSlice := range kvSliceMap {
-		reduceResult := reducef(k, vSlice)
-		appendToFile(outputFilename, k, reduceResult)
-	}
-}
-
-func appendToFile(filename string, key string, val string) {
-	file, err := os.Open(filename)
-	if err != nil {
-		panic(err)
-	}
-	_, err = file.WriteString(fmt.Sprintf("%v %v\n", key, val))
-	if err != nil {
-		panic(err)
-	}
-}
-
-func aggregateKvs(kvs []KeyValue) map[string][]string {
-	result := make(map[string][]string)
-	for _, kv := range kvs {
-		result[kv.Key] = append(result[kv.Key], kv.Value)
-	}
-	return result
-}
-
-func readReduceTaskInputParam(task *Task) []KeyValue {
-	id := task.ReduceId
-	var result []KeyValue
-	const intermediateResultPath = "../result/intermediate"
-	entries, err := os.ReadDir(intermediateResultPath)
-	if err != nil {
-		panic(err)
-	}
-	for _, entryFile := range entries {
-		if matchFileName2ReduceId(entryFile.Name(), id) {
-			kvs := buildJsonFileAsMap(entryFile, intermediateResultPath)
-			result = append(result, kvs...)
-		}
-	}
-	return result
-}
-
-func matchFileName2ReduceId(name string, id int) bool {
-	pattern := regexp.MustCompile(fmt.Sprintf(`^mr-.*-%d$`, id))
-	return pattern.Match([]byte(name))
-}
-
-func buildJsonFileAsMap(dirEntry os.DirEntry, path string) []KeyValue {
-	filePath := filepath.Join(path, dirEntry.Name())
-	file, err := os.Open(filePath)
-	if err != nil {
-		panic(err)
-	}
-	dec := json.NewDecoder(file)
-	var result []KeyValue
-	for {
-		var kv KeyValue
-		if err := dec.Decode(&kv); err != nil {
-			break
-		}
-		result = append(result, kv)
-	}
-	return result
-}
-
-func doMap(mapf func(string, string) []KeyValue, task *Task) {
-	content := readMapTaskContent(task)
-	filename := task.InputFilePath
-	kva := mapf(filename, string(content))
-	for _, kva := range kva {
-		appendResultToReduceFileByHashing(kva, task)
-	}
-	signalCoordinatorDone(task)
-}
-
-func signalCoordinatorDone(task *Task) {
-	args := &FinishTaskargs{Task: task}
-	reply := &FinishTaskReply{}
-	call("FinishTaskRemote", args, reply)
-}
-
-func appendResultToReduceFileByHashing(kva KeyValue, task *Task) {
-	log.Println("Appending result to reduce: ", kva.Key, kva.Value)
-	key := kva.Key
-	reduceId := ihash(key) % task.ReduceNum
-	reduceFilePath := task.GetIntermediateOutputFilePath(reduceId)
-	file, err := os.Open(reduceFilePath)
-	if err != nil {
-		var ftmp, err = os.Create(reduceFilePath)
-		if err != nil {
-			log.Fatal(err)
-		}
-		file = ftmp
-	}
-	encoder := json.NewEncoder(file)
-	jsonErr := encoder.Encode(&kva)
-	if jsonErr != nil {
-		log.Fatal(jsonErr)
-	}
-}
-
-func read(filename string) string {
-	file, err := os.Open(filename)
-	if err != nil {
-		log.Fatalf("cannot open %v", filename)
-	}
-	content, err := ioutil.ReadAll(file)
-	if err != nil {
-		log.Fatalf("cannot read %v", filename)
-	}
-	file.Close()
-	if content == nil {
-		return ""
-	}
-	return string(content)
-}
-
-func readMapTaskContent(task *Task) string {
-	filename := task.InputFilePath
-	content := read(filename)
-	return content
-}
-
-/*
-*
-The return value is (success， taskptr， hasTask)
-*/
-func getTaskWithStatus(status byte) (bool, *Task, bool) {
-	args := GetTaskWithStatusArgs{}
-	args.Status = status
-	reply := GetTaskWithStatusReply{}
-	success := call("GetTaskWithStatusRemote", &args, &reply)
-	if success {
-		return true, &reply.Task, reply.HasTask
-	}
-	return false, nil, false
-}
-
-func isNotDone() bool {
-	return false
-}
-
+//
 // example function to show how to make an RPC call to the coordinator.
 //
 // the RPC argument and reply types are defined in rpc.go.
+//
 func CallExample() {
 
 	// declare an argument structure.
@@ -233,9 +67,11 @@ func CallExample() {
 	}
 }
 
+//
 // send an RPC request to the coordinator, wait for the response.
 // usually returns true.
 // returns false if something goes wrong.
+//
 func call(rpcname string, args interface{}, reply interface{}) bool {
 	// c, err := rpc.DialHTTP("tcp", "127.0.0.1"+":1234")
 	sockname := coordinatorSock()

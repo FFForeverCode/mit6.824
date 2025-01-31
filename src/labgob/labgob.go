@@ -112,11 +112,13 @@ func checkType(t reflect.Type) {
 	}
 }
 
+//
 // warn if the value contains non-default values,
 // as it would if one sent an RPC but the reply
 // struct was already modified. if the RPC reply
 // contains default values, GOB won't overwrite
 // the non-default value.
+//
 func checkDefault(value interface{}) {
 	if value == nil {
 		return

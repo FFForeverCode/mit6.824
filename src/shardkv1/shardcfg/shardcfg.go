@@ -153,13 +153,12 @@ func (c *ShardConfig) Rebalance() {
 	}
 }
 
-func (cfg *ShardConfig) Join(servers map[tester.Tgid][]string) bool {
+func (cfg *ShardConfig) Join(servers map[tester.Tgid][]string) {
 	changed := false
 	for gid, servers := range servers {
 		_, ok := cfg.Groups[gid]
 		if ok {
-			log.Printf("re-Join %v", gid)
-			return false
+			log.Fatalf("re-Join %v", gid)
 		}
 		for xgid, xservers := range cfg.Groups {
 			for _, s1 := range xservers {
@@ -179,17 +178,16 @@ func (cfg *ShardConfig) Join(servers map[tester.Tgid][]string) bool {
 		log.Fatalf("Join but no change")
 	}
 	cfg.Num += 1
-	return true
 }
 
-func (cfg *ShardConfig) Leave(gids []tester.Tgid) bool {
+func (cfg *ShardConfig) Leave(gids []tester.Tgid) {
 	changed := false
 	for _, gid := range gids {
 		_, ok := cfg.Groups[gid]
 		if ok == false {
 			// already no GID!
-			log.Printf("Leave(%v) but not in config", gid)
-			return false
+			debug.PrintStack()
+			log.Fatalf("Leave(%v) but not in config", gid)
 		} else {
 			// modify op.Config to reflect the Leave()
 			delete(cfg.Groups, gid)
@@ -201,23 +199,16 @@ func (cfg *ShardConfig) Leave(gids []tester.Tgid) bool {
 		log.Fatalf("Leave but no change")
 	}
 	cfg.Num += 1
-	return true
 }
 
-func (cfg *ShardConfig) JoinBalance(servers map[tester.Tgid][]string) bool {
-	if !cfg.Join(servers) {
-		return false
-	}
+func (cfg *ShardConfig) JoinBalance(servers map[tester.Tgid][]string) {
+	cfg.Join(servers)
 	cfg.Rebalance()
-	return true
 }
 
-func (cfg *ShardConfig) LeaveBalance(gids []tester.Tgid) bool {
-	if !cfg.Leave(gids) {
-		return false
-	}
+func (cfg *ShardConfig) LeaveBalance(gids []tester.Tgid) {
+	cfg.Leave(gids)
 	cfg.Rebalance()
-	return true
 }
 
 func (cfg *ShardConfig) GidServers(sh Tshid) (tester.Tgid, []string, bool) {

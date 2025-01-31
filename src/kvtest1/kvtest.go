@@ -2,8 +2,7 @@ package kvtest
 
 import (
 	"encoding/json"
-	"fmt"
-	//"log"
+	// "log"
 	"math/rand"
 	"strconv"
 	"testing"
@@ -17,7 +16,6 @@ import (
 // (much more than the paper's range of timeouts).
 const ElectionTimeout = 1 * time.Second
 
-// n specifies the length of the string to be generated.
 func RandValue(n int) string {
 	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
@@ -77,45 +75,24 @@ func (ts *Test) MakeClerk() IKVClerk {
 	return ts.mck.MakeClerk()
 }
 
-// Assumes different ck's put to different keys
 func (ts *Test) PutAtLeastOnce(ck IKVClerk, key, value string, ver rpc.Tversion, me int) rpc.Tversion {
-	verPrev := ver
 	for true {
-		err := ts.Put(ck, key, value, ver, me)
-		if err == rpc.OK {
-			ver += 1
+		if err := ts.Put(ck, key, value, ver, me); err == rpc.OK {
 			break
 		}
-		if err == rpc.ErrMaybe || err == rpc.ErrVersion {
-			ver += 1
-		} else {
-			// if failed with ver = 0, retry
-			if ver != 0 { // check that ver is indeed 0
-				ts.Fatalf("Put %v ver %d err %v", key, ver, err)
-			}
-		}
+		ver += 1
 	}
-	desp := fmt.Sprintf("Put(%v, %v) completes", key, value)
-	details := fmt.Sprintf("version: %v -> %v", verPrev, ver)
-	tester.AnnotateInfo(desp, details)
 	return ver
 }
 
 func (ts *Test) CheckGet(ck IKVClerk, key, value string, version rpc.Tversion) {
-	tester.AnnotateCheckerBegin(fmt.Sprintf("checking Get(%v) = (%v, %v)", key, value, version))
 	val, ver, err := ts.Get(ck, key, 0)
 	if err != rpc.OK {
-		text := fmt.Sprintf("Get(%v) returns error = %v", key, err)
-		tester.AnnotateCheckerFailure(text, text)
-		ts.Fatalf(text)
+		ts.Fatalf("CheckGet err %v", err)
 	}
-	if val != value || ver != version {
-		text := fmt.Sprintf("Get(%v) returns (%v, %v) != (%v, %v)", key, val, ver, value, version)
-		tester.AnnotateCheckerFailure(text, text)
-		ts.Fatalf(text)
+	if val != value || ver != ver {
+		ts.Fatalf("Get(%v): expected:\n%v %v\nreceived:\n%v %v", key, value, val, version, ver)
 	}
-	text := fmt.Sprintf("Get(%v) returns (%v, %v) as expected", key, val, ver)
-	tester.AnnotateCheckerSuccess(text, "OK")
 }
 
 type ClntRes struct {
@@ -123,19 +100,18 @@ type ClntRes struct {
 	Nmaybe int
 }
 
-func (ts *Test) CheckPutConcurrent(ck IKVClerk, key string, rs []ClntRes, res *ClntRes, reliable bool) {
+func (ts *Test) CheckPutConcurrent(ck IKVClerk, key string, rs []ClntRes, res *ClntRes) {
 	e := EntryV{}
 	ver0 := ts.GetJson(ck, key, -1, &e)
 	for _, r := range rs {
 		res.Nok += r.Nok
 		res.Nmaybe += r.Nmaybe
 	}
-	if reliable {
-		if ver0 != rpc.Tversion(res.Nok) {
-			ts.Fatalf("Reliable: Wrong number of puts: server %d clnts %v", ver0, res)
-		}
-	} else if ver0 > rpc.Tversion(res.Nok+res.Nmaybe) {
-		ts.Fatalf("Unreliable: Wrong number of puts: server %d clnts %v", ver0, res)
+	if !ts.IsReliable() && ver0 > rpc.Tversion(res.Nok+res.Nmaybe) {
+		ts.Fatalf("Wrong number of puts: server %d clnts %v", ver0, res)
+	}
+	if ts.IsReliable() && ver0 != rpc.Tversion(res.Nok) {
+		ts.Fatalf("Wrong number of puts: server %d clnts %v", ver0, res)
 	}
 }
 
@@ -228,10 +204,9 @@ func (ts *Test) OnePut(me int, ck IKVClerk, key string, ver rpc.Tversion) (rpc.T
 
 // repartition the servers periodically
 func (ts *Test) Partitioner(gid tester.Tgid, ch chan bool) {
-	//log.Printf("partioner %v", gid)
 	defer func() { ch <- true }()
 	for true {
-		select {
+		switch {
 		case <-ch:
 			return
 		default:
@@ -249,7 +224,6 @@ func (ts *Test) Partitioner(gid tester.Tgid, ch chan bool) {
 				}
 			}
 			ts.Group(gid).Partition(pa[0], pa[1])
-			tester.AnnotateTwoPartitions(pa[0], pa[1])
 			time.Sleep(ElectionTimeout + time.Duration(rand.Int63()%200)*time.Millisecond)
 		}
 	}
@@ -291,21 +265,17 @@ func MakeKeys(n int) []string {
 	return keys
 }
 
-func (ts *Test) SpreadPutsSize(ck IKVClerk, n, valsz int) ([]string, []string) {
+func (ts *Test) SpreadPuts(ck IKVClerk, n int) ([]string, []string) {
 	ka := MakeKeys(n)
 	va := make([]string, n)
 	for i := 0; i < n; i++ {
-		va[i] = tester.Randstring(valsz)
+		va[i] = tester.Randstring(20)
 		ck.Put(ka[i], va[i], rpc.Tversion(0))
 	}
 	for i := 0; i < n; i++ {
 		ts.CheckGet(ck, ka[i], va[i], rpc.Tversion(1))
 	}
 	return ka, va
-}
-
-func (ts *Test) SpreadPuts(ck IKVClerk, n int) ([]string, []string) {
-	return ts.SpreadPutsSize(ck, n, 20)
 }
 
 type entry struct {

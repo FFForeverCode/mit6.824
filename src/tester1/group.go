@@ -6,18 +6,12 @@ import (
 	"sync"
 
 	"6.5840/labrpc"
+	"6.5840/raft"
 )
 
 type Tgid int
 
-// A service must support Kill(); the tester will Kill()
-// on service returned by FstartServer()
-type IService interface {
-	Kill()
-}
-
-// Start server and return the services to register with labrpc
-type FstartServer func(ends []*labrpc.ClientEnd, grp Tgid, srv int, persister *Persister) []IService
+type FstartServer func(ends []*labrpc.ClientEnd, grp Tgid, srv int, persister *raft.Persister, maxraftstate int) IKVServer
 
 // Each server has a name: i'th server of group gid. If there is only a single
 // server, it its gid = 0 and its i is 0.
@@ -37,11 +31,11 @@ func newGroups(net *labrpc.Network) *Groups {
 	return &Groups{net: net, grps: make(map[Tgid]*ServerGrp)}
 }
 
-func (gs *Groups) MakeGroup(gid Tgid, nsrv int, mks FstartServer) {
+func (gs *Groups) MakeGroup(gid Tgid, nsrv, maxraftstate int, mks FstartServer) {
 	gs.mu.Lock()
 	defer gs.mu.Unlock()
 
-	gs.grps[gid] = makeSrvGrp(gs.net, gid, nsrv, mks)
+	gs.grps[gid] = makeSrvGrp(gs.net, gid, nsrv, maxraftstate, mks)
 }
 
 func (gs *Groups) lookupGroup(gid Tgid) *ServerGrp {
@@ -68,22 +62,24 @@ func (gs *Groups) cleanup() {
 }
 
 type ServerGrp struct {
+	Maxraftstate int
+
 	net         *labrpc.Network
 	srvs        []*Server
 	servernames []string
 	gid         Tgid
 	connected   []bool // whether each server is on the net
 	mks         FstartServer
-	mu          sync.Mutex
 }
 
-func makeSrvGrp(net *labrpc.Network, gid Tgid, n int, mks FstartServer) *ServerGrp {
+func makeSrvGrp(net *labrpc.Network, gid Tgid, n, m int, mks FstartServer) *ServerGrp {
 	sg := &ServerGrp{
-		net:       net,
-		srvs:      make([]*Server, n),
-		gid:       gid,
-		connected: make([]bool, n),
-		mks:       mks,
+		Maxraftstate: m,
+		net:          net,
+		srvs:         make([]*Server, n),
+		gid:          gid,
+		connected:    make([]bool, n),
+		mks:          mks,
 	}
 	for i, _ := range sg.srvs {
 		sg.srvs[i] = makeServer(net, gid, n)
@@ -101,18 +97,6 @@ func (sg *ServerGrp) N() int {
 
 func (sg *ServerGrp) SrvNames() []string {
 	return sg.servernames
-}
-
-func (sg *ServerGrp) SrvName(i int) string {
-	return sg.servernames[i]
-}
-
-func (sg *ServerGrp) Services() [][]IService {
-	ss := make([][]IService, 0, len(sg.srvs))
-	for _, s := range sg.srvs {
-		ss = append(ss, s.svcs)
-	}
-	return ss
 }
 
 func (sg *ServerGrp) SrvNamesTo(to []int) []string {
@@ -143,27 +127,25 @@ func (sg *ServerGrp) ConnectOne(i int) {
 
 func (sg *ServerGrp) cleanup() {
 	for _, s := range sg.srvs {
-		if s.svcs != nil {
-			for _, svc := range s.svcs {
-				svc.Kill()
-			}
+		if s.kvsrv != nil {
+			s.kvsrv.Kill()
 		}
 	}
 }
 
-// attach server i to servers listed in to caller must hold cfg.mu.
+// attach server i to servers listed in to
+// caller must hold cfg.mu
 func (sg *ServerGrp) connect(i int, to []int) {
 	//log.Printf("connect peer %d to %v\n", i, to)
 
 	sg.connected[i] = true
 
-	// connect outgoing end points
-	sg.srvs[i].connect(sg, to)
+	// outgoing socket files
+	sg.srvs[i].connect(to)
 
-	// connect incoming end points to me
+	// incoming socket files
 	for j := 0; j < len(to); j++ {
-		if sg.IsConnected(to[j]) {
-			//log.Printf("connect %d (%v) to %d", to[j], sg.srvs[to[j]].endNames[i], i)
+		if sg.IsConnected(j) {
 			endname := sg.srvs[to[j]].endNames[i]
 			sg.net.Enable(endname, true)
 		}
@@ -175,9 +157,7 @@ func (sg *ServerGrp) connect(i int, to []int) {
 func (sg *ServerGrp) disconnect(i int, from []int) {
 	// log.Printf("%p: disconnect peer %d from %v\n", sg, i, from)
 
-	sg.mu.Lock()
 	sg.connected[i] = false
-	sg.mu.Unlock()
 
 	// outgoing socket files
 	sg.srvs[i].disconnect(from)
@@ -198,13 +178,7 @@ func (sg *ServerGrp) DisconnectAll(i int) {
 }
 
 func (sg *ServerGrp) IsConnected(i int) bool {
-	defer sg.mu.Unlock()
-	sg.mu.Lock()
 	return sg.connected[i]
-}
-
-func (sg *ServerGrp) GetConnected() []bool {
-	return sg.connected
 }
 
 // Maximum log size across all servers
@@ -236,11 +210,13 @@ func (sg *ServerGrp) StartServer(i int) {
 	srv := sg.srvs[i].startServer(sg.gid)
 	sg.srvs[i] = srv
 
-	srv.svcs = sg.mks(srv.clntEnds, sg.gid, i, srv.saved)
+	srv.kvsrv = sg.mks(srv.clntEnds, sg.gid, i, srv.saved, sg.Maxraftstate)
+	kvsvc := labrpc.MakeService(srv.kvsrv)
 	labsrv := labrpc.MakeServer()
-	for _, svc := range srv.svcs {
-		s := labrpc.MakeService(svc)
-		labsrv.AddService(s)
+	labsrv.AddService(kvsvc)
+	if len(sg.srvs) > 1 { // Run with raft?
+		rfsvc := labrpc.MakeService(srv.kvsrv.Raft())
+		labsrv.AddService(rfsvc)
 	}
 	sg.net.AddServer(ServerName(sg.gid, i), labsrv)
 }
@@ -253,7 +229,6 @@ func (sg *ServerGrp) StartServers() {
 
 // Shutdown a server by isolating it
 func (sg *ServerGrp) ShutdownServer(i int) {
-	//log.Printf("ShutdownServer %v", ServerName(sg.gid, i))
 	sg.disconnect(i, sg.all())
 
 	// disable client connections to the server.
@@ -279,8 +254,23 @@ func (sg *ServerGrp) start() {
 	}
 }
 
+func (sg *ServerGrp) GetState(i int) (int, bool) {
+	return sg.srvs[i].kvsrv.Raft().GetState()
+}
+
+func (sg *ServerGrp) Leader() (bool, int) {
+	for i, _ := range sg.srvs {
+		_, is_leader := sg.GetState(i)
+		if is_leader {
+			return true, i
+		}
+	}
+	return false, 0
+}
+
 // Partition servers into 2 groups and put current leader in minority
-func (sg *ServerGrp) MakePartition(l int) ([]int, []int) {
+func (sg *ServerGrp) MakePartition() ([]int, []int) {
+	_, l := sg.Leader()
 	n := len(sg.srvs)
 	p1 := make([]int, n/2+1)
 	p2 := make([]int, n/2)
@@ -300,7 +290,7 @@ func (sg *ServerGrp) MakePartition(l int) ([]int, []int) {
 }
 
 func (sg *ServerGrp) Partition(p1 []int, p2 []int) {
-	//log.Printf("partition servers into: %v %v\n", p1, p2)
+	// log.Printf("partition servers into: %v %v\n", p1, p2)
 	for i := 0; i < len(p1); i++ {
 		sg.disconnect(p1[i], p2)
 		sg.connect(p1[i], p1)

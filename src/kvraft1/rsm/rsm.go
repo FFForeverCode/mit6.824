@@ -5,18 +5,16 @@ import (
 
 	"6.5840/kvsrv1/rpc"
 	"6.5840/labrpc"
-	"6.5840/raft1"
-	"6.5840/raftapi"
-	"6.5840/tester1"
-)
+	"6.5840/raft"
 
-var useRaftStateMachine bool // to plug in another raft besided raft1
+)
 
 type Op struct {
 	// Your definitions here.
 	// Field names must start with capital letters,
 	// otherwise RPC will break.
 }
+
 
 // A server (i.e., ../server.go) that wants to replicate itself calls
 // MakeRSM and must implement the StateMachine interface.  This
@@ -33,8 +31,8 @@ type StateMachine interface {
 type RSM struct {
 	mu           sync.Mutex
 	me           int
-	rf           raftapi.Raft
-	applyCh      chan raftapi.ApplyMsg
+	rf           *raft.Raft
+	applyCh      chan raft.ApplyMsg
 	maxraftstate int // snapshot if log grows this big
 	sm           StateMachine
 	// Your definitions here.
@@ -43,9 +41,7 @@ type RSM struct {
 // servers[] contains the ports of the set of
 // servers that will cooperate via Raft to
 // form the fault-tolerant key/value service.
-//
 // me is the index of the current server in servers[].
-//
 // the k/v server should store snapshots through the underlying Raft
 // implementation, which should call persister.SaveStateAndSnapshot() to
 // atomically save the Raft state along with the snapshot.
@@ -55,31 +51,37 @@ type RSM struct {
 //
 // MakeRSM() must return quickly, so it should start goroutines for
 // any long-running work.
-func MakeRSM(servers []*labrpc.ClientEnd, me int, persister *tester.Persister, maxraftstate int, sm StateMachine) *RSM {
+func MakeRSM(servers []*labrpc.ClientEnd, me int, persister *raft.Persister, maxraftstate int, sm StateMachine) *RSM {
 	rsm := &RSM{
 		me:           me,
 		maxraftstate: maxraftstate,
-		applyCh:      make(chan raftapi.ApplyMsg),
+		applyCh:      make(chan raft.ApplyMsg),
 		sm:           sm,
 	}
-	if !useRaftStateMachine {
-		rsm.rf = raft.Make(servers, me, persister, rsm.applyCh)
-	}
+	rsm.rf = raft.Make(servers, me, persister, rsm.applyCh)
 	return rsm
 }
 
-func (rsm *RSM) Raft() raftapi.Raft {
+func (rsm *RSM) Raft() *raft.Raft {
 	return rsm.rf
 }
 
-// Submit a command to Raft, and wait for it to be committed.  It
-// should return ErrWrongLeader if client should find new leader and
-// try again.
+
+// submit a command to Raft,
+// and wait for it to be committed.
+// perform() will tell us via ClientStatus and lastApplied
+// when our command is either executed or not.
+//
+// returns (executeError, executeResult)
+// if executeError==ErrWrongLeader, client should find new leader
+// and try again.
 func (rsm *RSM) Submit(req any) (rpc.Err, any) {
+	rsm.mu.Lock()
+	defer rsm.mu.Unlock()
 
 	// Submit creates an Op structure to run a command through Raft;
-	// for example: op := Op{Me: rsm.me, Id: id, Req: req}, where req
-	// is the argument to Submit and id is a unique id for the op.
+	// for example: op := Op{Id: rsm.nextId, Req: req}, where req is
+	// the argument to Submit and rsm.nextId a unique id for the op.
 
 	// your code here
 	return rpc.ErrWrongLeader, nil // i'm dead, try another server.

@@ -6,25 +6,16 @@ import (
 	"sync"
 
 	"6.5840/labgob"
+	// "6.5840/kvtest1"
 	"6.5840/labrpc"
-	"6.5840/raftapi"
-	"6.5840/tester1"
+	"6.5840/raft"
 )
 
 type Inc struct {
 }
 
-type IncRep struct {
+type Rep struct {
 	N int
-}
-
-type Null struct {
-}
-
-type NullRep struct {
-}
-
-type Dec struct {
 }
 
 type rsmSrv struct {
@@ -35,14 +26,11 @@ type rsmSrv struct {
 	counter int
 }
 
-func makeRsmSrv(ts *Test, srv int, ends []*labrpc.ClientEnd, persister *tester.Persister, snapshot bool) *rsmSrv {
+func makeRsmSrv(ts *Test, srv int, ends []*labrpc.ClientEnd, persister *raft.Persister, snapshot bool) *rsmSrv {
 	//log.Printf("mksrv %d", srv)
 	labgob.Register(Op{})
 	labgob.Register(Inc{})
-	labgob.Register(IncRep{})
-	labgob.Register(Null{})
-	labgob.Register(NullRep{})
-	labgob.Register(Dec{})
+	labgob.Register(Rep{})
 	s := &rsmSrv{
 		ts: ts,
 		me: srv,
@@ -52,20 +40,9 @@ func makeRsmSrv(ts *Test, srv int, ends []*labrpc.ClientEnd, persister *tester.P
 }
 
 func (rs *rsmSrv) DoOp(req any) any {
-	//log.Printf("%d: DoOp: %T(%v)", rs.me, req, req)
-	switch req.(type) {
-	case Inc:
-		rs.mu.Lock()
-		rs.counter += 1
-		rs.mu.Unlock()
-		return &IncRep{rs.counter}
-	case Null:
-		return &NullRep{}
-	default:
-		// wrong type! expecting an Inc.
-		log.Fatalf("DoOp should execute only Inc and not %T", req)
-	}
-	return nil
+	//log.Printf("%d: DoOp: %v", rs.me, req)
+	rs.counter += 1
+	return &Rep{rs.counter}
 }
 
 func (rs *rsmSrv) Snapshot() []byte {
@@ -93,7 +70,7 @@ func (rs *rsmSrv) Kill() {
 	rs.rsm = nil
 }
 
-func (rs *rsmSrv) Raft() raftapi.Raft {
+func (rs *rsmSrv) Raft() *raft.Raft {
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
 	return rs.rsm.Raft()

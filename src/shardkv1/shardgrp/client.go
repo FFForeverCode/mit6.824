@@ -1,6 +1,8 @@
 package shardgrp
 
 import (
+
+
 	"6.5840/kvsrv1/rpc"
 	"6.5840/shardkv1/shardcfg"
 	"6.5840/tester1"
@@ -9,7 +11,7 @@ import (
 type Clerk struct {
 	clnt    *tester.Clnt
 	servers []string
-	// You will have to modify this struct.
+	leader  int // last successful leader (index into servers[])
 }
 
 func MakeClerk(clnt *tester.Clnt, servers []string) *Clerk {
@@ -17,27 +19,20 @@ func MakeClerk(clnt *tester.Clnt, servers []string) *Clerk {
 	return ck
 }
 
-func (ck *Clerk) Get(key string) (string, rpc.Tversion, rpc.Err) {
+func (ck *Clerk) Get(cid shardcfg.Tnum, key string, n shardcfg.Tnum) (string, rpc.Tversion, rpc.Err) {
 	// Your code here
 	return "", 0, ""
 }
 
-func (ck *Clerk) Put(key string, value string, version rpc.Tversion) rpc.Err {
+func (ck *Clerk) Put(key string, value string, version rpc.Tversion, n shardcfg.Tnum) (bool, rpc.Err) {
 	// Your code here
-	return ""
+	return false, ""
 }
 
-func (ck *Clerk) FreezeShard(s shardcfg.Tshid, num shardcfg.Tnum) ([]byte, rpc.Err) {
-	// Your code here
+func (ck *Clerk) Freeze(s shardcfg.Tshid, num shardcfg.Tnum) ([]byte, rpc.Err) {
 	return nil, ""
 }
 
 func (ck *Clerk) InstallShard(s shardcfg.Tshid, state []byte, num shardcfg.Tnum) rpc.Err {
-	// Your code here
-	return ""
-}
-
-func (ck *Clerk) DeleteShard(s shardcfg.Tshid, num shardcfg.Tnum) rpc.Err {
-	// Your code here
 	return ""
 }
