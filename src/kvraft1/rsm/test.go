@@ -7,7 +7,7 @@ import (
 
 	"6.5840/kvsrv1/rpc"
 	"6.5840/labrpc"
-	"6.5840/raft"
+	//"6.5840/raft1"
 	"6.5840/tester1"
 )
 
@@ -31,7 +31,7 @@ func makeTest(t *testing.T, maxraftstate int) *Test {
 		maxraftstate: maxraftstate,
 		srvs:         make([]*rsmSrv, NSRV),
 	}
-	ts.Config = tester.MakeConfig(t, NSRV, true, maxraftstate, ts.mksrv)
+	ts.Config = tester.MakeConfig(t, NSRV, true, ts.mksrv)
 	ts.g = ts.Group(tester.GRP0)
 	return ts
 }
@@ -42,10 +42,10 @@ func (ts *Test) cleanup() {
 	ts.CheckTimeout()
 }
 
-func (ts *Test) mksrv(ends []*labrpc.ClientEnd, grp tester.Tgid, srv int, persister *raft.Persister, maxraftstate int) tester.IKVServer {
+func (ts *Test) mksrv(ends []*labrpc.ClientEnd, grp tester.Tgid, srv int, persister *tester.Persister) []tester.IService {
 	s := makeRsmSrv(ts, srv, ends, persister, false)
 	ts.srvs[srv] = s
-	return s
+	return []tester.IService{s.rsm.Raft()}
 }
 
 func (ts *Test) one() *Rep {

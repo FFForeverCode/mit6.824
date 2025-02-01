@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"6.5840/kvtest1"
+	"6.5840/labrpc"
+	"6.5840/raft1"
 	"6.5840/tester1"
 )
 
@@ -22,7 +24,6 @@ type Test struct {
 const Gid = tester.GRP0
 
 func MakeTest(t *testing.T, part string, nclients, nservers int, reliable bool, crash bool, partitions bool, maxraftstate int, randomkeys bool) *Test {
-	cfg := tester.MakeConfig(t, nservers, reliable, maxraftstate, StartKVServer)
 	ts := &Test{
 		t:            t,
 		part:         part,
@@ -33,15 +34,37 @@ func MakeTest(t *testing.T, part string, nclients, nservers int, reliable bool, 
 		maxraftstate: maxraftstate,
 		randomkeys:   randomkeys,
 	}
+	cfg := tester.MakeConfig(t, nservers, reliable, ts.StartKVServer)
 	ts.Test = kvtest.MakeTest(t, cfg, randomkeys, ts)
 	ts.Begin(ts.makeTitle())
 	return ts
+}
+
+func (ts *Test) StartKVServer(servers []*labrpc.ClientEnd, gid tester.Tgid, me int, persister *tester.Persister) []tester.IService {
+	return StartKVServer(servers, gid, me, persister, ts.maxraftstate)
+
 }
 
 func (ts *Test) MakeClerk() kvtest.IKVClerk {
 	clnt := ts.Config.MakeClient()
 	ck := MakeClerk(clnt, ts.Group(Gid).SrvNames())
 	return &kvtest.TestClerk{ck, clnt}
+}
+
+func (ts *Test) Leader() (bool, int) {
+	for i, ss := range ts.Group(Gid).Services() {
+		for _, s := range ss {
+			switch r := s.(type) {
+			case *raft.Raft:
+				_, is_leader := r.GetState()
+				if is_leader {
+					return true, i
+				}
+			default:
+			}
+		}
+	}
+	return false, 0
 }
 
 func (ts *Test) DeleteClerk(ck kvtest.IKVClerk) {

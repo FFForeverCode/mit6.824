@@ -1,0 +1,164 @@
+=== RUN   TestInitialElection3A
+Test (3A): initial election (reliable network)...
+  ... Passed --   3.9  3    38    0
+--- PASS: TestInitialElection3A (3.95s)
+=== RUN   TestReElection3A
+Test (3A): election after network failure (reliable network)...
+  ... Passed --   6.4  3    68    0
+--- PASS: TestReElection3A (6.43s)
+=== RUN   TestManyElections3A
+Test (3A): multiple elections (reliable network)...
+  ... Passed --   9.7  7   414    0
+--- PASS: TestManyElections3A (9.66s)
+=== RUN   TestBasicAgree3B
+Test (3B): basic agreement (reliable network)...
+  ... Passed --   1.9  3    18    0
+--- PASS: TestBasicAgree3B (1.91s)
+=== RUN   TestRPCBytes3B
+Test (3B): RPC byte count (reliable network)...
+  ... Passed --   3.5  3    50    0
+--- PASS: TestRPCBytes3B (3.50s)
+=== RUN   TestFollowerFailure3B
+Test (3B): test progressive failure of followers (reliable network)...
+  ... Passed --   5.9  3    60    0
+--- PASS: TestFollowerFailure3B (5.90s)
+=== RUN   TestLeaderFailure3B
+Test (3B): test failure of leaders (reliable network)...
+  ... Passed --   6.5  3   113    0
+--- PASS: TestLeaderFailure3B (6.52s)
+=== RUN   TestFailAgree3B
+Test (3B): agreement after follower reconnects (reliable network)...
+  ... Passed --   6.4  3    68    0
+--- PASS: TestFailAgree3B (6.43s)
+=== RUN   TestFailNoAgree3B
+Test (3B): no agreement if too many followers disconnect (reliable network)...
+  ... Passed --   4.7  5   116    0
+--- PASS: TestFailNoAgree3B (4.69s)
+=== RUN   TestConcurrentStarts3B
+Test (3B): concurrent Start()s (reliable network)...
+  ... Passed --   2.1  3    20    0
+--- PASS: TestConcurrentStarts3B (2.06s)
+=== RUN   TestRejoin3B
+Test (3B): rejoin of partitioned leader (reliable network)...
+  ... Passed --   7.9  3   102    0
+--- PASS: TestRejoin3B (7.91s)
+=== RUN   TestBackup3B
+Test (3B): leader backs up quickly over incorrect follower logs (reliable network)...
+  ... Passed --  26.0  5   944    0
+--- PASS: TestBackup3B (26.04s)
+=== RUN   TestCount3B
+Test (3B): RPC counts aren't too high (reliable network)...
+  ... Passed --   3.5  3    34    0
+--- PASS: TestCount3B (3.55s)
+=== RUN   TestPersist13C
+Test (3C): basic persistence (reliable network)...
+  ... Passed --   6.8  3    58    0
+--- PASS: TestPersist13C (6.77s)
+=== RUN   TestPersist23C
+Test (3C): more persistence (reliable network)...
+  ... Passed --  21.9  5   337    0
+--- PASS: TestPersist23C (21.89s)
+=== RUN   TestPersist33C
+Test (3C): partitioned leader and one follower crash, leader restarts (reliable network)...
+  ... Passed --   3.6  3    32    0
+--- PASS: TestPersist33C (3.63s)
+=== RUN   TestFigure83C
+Test (3C): Figure 8 (reliable netwTestFigure83Cork)...
+goroutine 7711 [running]:
+runtime/debug.Stack()
+	/usr/lib/go/src/runtime/debug/stack.go:26 +0x67
+runtime/debug.PrintStack()
+	/usr/lib/go/src/runtime/debug/stack.go:18 +0x1d
+6.5840/tester1.(*Config).Fatalf(0xc0001d0c00, {0x7d12ea, 0x21}, {0xc000519df0, 0x1, 0x1})
+	/home/kaashoek/classes/65840-2025/staff/mygo/src/tester1/config.go:145 +0x3b
+6.5840/raft1.(*Test).one(0xc0001d0ba0, {0x777260, 0xc0003a9bd8}, 0x5, 0x1)
+	/home/kaashoek/classes/65840-2025/staff/mygo/src/raft1/test.go:227 +0x227
+6.5840/raft1.TestFigure83C(0xc00030cea0)
+	/home/kaashoek/classes/65840-2025/staff/mygo/src/raft1/raft_test.go:824 +0x3f0
+testing.tRunner(0xc00030cea0, 0x7db020)
+	/usr/lib/go/src/testing/testing.go:1690 +0x227
+created by testing.(*T).Run in goroutine 1
+	/usr/lib/go/src/testing/testing.go:1743 +0x826
+    config.go:146: one(3082010368482628662) failed to reach agreement
+--- FAIL: TestFigure83C (59.13s)
+=== RUN   TestUnreliableAgree3C
+Test (3C): unreliable agreement (unreliable network)...
+  ... Passed --   4.4  5   245    0
+--- PASS: TestUnreliableAgree3C (4.42s)
+=== RUN   TestFigure8Unreliable3C
+Test (3C): Figure 8 (unreliable) (unreliable network)...
+  ... Passed --  34.3  5   845    0
+--- PASS: TestFigure8Unreliable3C (34.26s)
+=== RUN   TestReliableChurn3C
+Test (3C): churn (reliable network)...
+goroutine 21747 [running]:
+runtime/debug.Stack()
+	/usr/lib/go/src/runtime/debug/stack.go:26 +0x67
+runtime/debug.PrintStack()
+	/usr/lib/go/src/runtime/debug/stack.go:18 +0x1d
+6.5840/tester1.(*Config).Fatalf(0xc000845d40, {0x7d12ea, 0x21}, {0xc000519cd0, 0x1, 0x1})
+	/home/kaashoek/classes/65840-2025/staff/mygo/src/tester1/config.go:145 +0x3b
+6.5840/raft1.(*Test).one(0xc000845ce0, {0x777260, 0xc000735788}, 0x5, 0x1)
+	/home/kaashoek/classes/65840-2025/staff/mygo/src/raft1/test.go:227 +0x227
+6.5840/raft1.internalChurn(0xc000258000, 0x1)
+	/home/kaashoek/classes/65840-2025/staff/mygo/src/raft1/raft_test.go:1028 +0xbd0
+6.5840/raft1.TestReliableChurn3C(0xc000258000)
+	/home/kaashoek/classes/65840-2025/staff/mygo/src/raft1/raft_test.go:1055 +0x2c
+testing.tRunner(0xc000258000, 0x7db080)
+	/usr/lib/go/src/testing/testing.go:1690 +0x227
+created by testing.(*T).Run in goroutine 1
+	/usr/lib/go/src/testing/testing.go:1743 +0x826
+    config.go:146: one(4060683027750831645) failed to reach agreement
+--- FAIL: TestReliableChurn3C (26.10s)
+=== RUN   TestUnreliableChurn3C
+Test (3C): unreliable churn (unreliable network)...
+goroutine 26074 [running]:
+runtime/debug.Stack()
+	/usr/lib/go/src/runtime/debug/stack.go:26 +0x67
+runtime/debug.PrintStack()
+	/usr/lib/go/src/runtime/debug/stack.go:18 +0x1d
+6.5840/tester1.(*Config).Fatalf(0xc00074db00, {0x7d12ea, 0x21}, {0xc000519cd0, 0x1, 0x1})
+	/home/kaashoek/classes/65840-2025/staff/mygo/src/tester1/config.go:145 +0x3b
+6.5840/raft1.(*Test).one(0xc00074daa0, {0x777260, 0xc000634008}, 0x5, 0x1)
+	/home/kaashoek/classes/65840-2025/staff/mygo/src/raft1/test.go:227 +0x227
+6.5840/raft1.internalChurn(0xc0001c2000, 0x0)
+	/home/kaashoek/classes/65840-2025/staff/mygo/src/raft1/raft_test.go:1028 +0xbd0
+6.5840/raft1.TestUnreliableChurn3C(0xc0001c2000)
+	/home/kaashoek/classes/65840-2025/staff/mygo/src/raft1/raft_test.go:1059 +0x29
+testing.tRunner(0xc0001c2000, 0x7db0c8)
+	/usr/lib/go/src/testing/testing.go:1690 +0x227
+created by testing.(*T).Run in goroutine 1
+	/usr/lib/go/src/testing/testing.go:1743 +0x826
+    config.go:146: one(8736026451642885096) failed to reach agreement
+--- FAIL: TestUnreliableChurn3C (26.11s)
+=== RUN   TestSnapshotBasic3D
+Test (3D): snapshots basic (reliable network)...
+  ... Passed --  11.0  3   201    0
+--- PASS: TestSnapshotBasic3D (11.04s)
+=== RUN   TestSnapshotInstall3D
+Test (3D): install snapshots (disconnect) (reliable network)...
+  ... Passed --  65.5  3   909    0
+--- PASS: TestSnapshotInstall3D (65.46s)
+=== RUN   TestSnapshotInstallUnreliable3D
+Test (3D): install snapshots (disconnect) (unreliable network)...
+  ... Passed --  88.1  3  1159    0
+--- PASS: TestSnapshotInstallUnreliable3D (88.10s)
+=== RUN   TestSnapshotInstallCrash3D
+Test (3D): install snapshots (crash) (reliable network)...
+  ... Passed --  53.4  3   590    0
+--- PASS: TestSnapshotInstallCrash3D (53.38s)
+=== RUN   TestSnapshotInstallUnCrash3D
+Test (3D): install snapshots (crash) (unreliable network)...
+  ... Passed --  65.6  3   690    0
+--- PASS: TestSnapshotInstallUnCrash3D (65.60s)
+=== RUN   TestSnapshotAllCrash3D
+Test (3D): crash and restart all servers (unreliable network)...
+  ... Passed --  23.2  3   336    0
+--- PASS: TestSnapshotAllCrash3D (23.20s)
+=== RUN   TestSnapshotInit3D
+Test (3D): snapshot initialization after crash (unreliable network)...
+  ... Passed --   6.3  3    75    0
+--- PASS: TestSnapshotInit3D (6.34s)
+FAIL
+exit status 1
+FAIL	6.5840/raft1	584.014s

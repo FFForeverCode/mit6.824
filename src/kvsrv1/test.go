@@ -15,7 +15,7 @@ type TestKV struct {
 }
 
 func MakeTestKV(t *testing.T, reliable bool) *TestKV {
-	cfg := tester.MakeConfig(t, 1, reliable, -1, StartKVServer)
+	cfg := tester.MakeConfig(t, 1, reliable, StartKVServer)
 	ts := &TestKV{
 		t:        t,
 		reliable: reliable,

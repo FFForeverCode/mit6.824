@@ -8,15 +8,12 @@ import (
 
 	"6.5840/labgob"
 	"6.5840/labrpc"
-	"6.5840/raftapi"
 	"6.5840/tester1"
 )
 
 const (
 	SnapShotInterval = 10
 )
-
-var useRaftStateMachine bool // to plug in another raft besided raft1
 
 type rfsrv struct {
 	ts          *Test
@@ -26,7 +23,7 @@ type rfsrv struct {
 	persister   *tester.Persister
 
 	mu   sync.Mutex
-	raft raftapi.Raft
+	raft *Raft
 	logs map[int]any // copy of each server's committed entries
 }
 
@@ -38,10 +35,8 @@ func newRfsrv(ts *Test, srv int, ends []*labrpc.ClientEnd, persister *tester.Per
 		logs:      map[int]any{},
 		persister: persister,
 	}
-	applyCh := make(chan raftapi.ApplyMsg)
-	if !useRaftStateMachine {
-		s.raft = Make(ends, srv, persister, applyCh)
-	}
+	applyCh := make(chan ApplyMsg)
+	s.raft = Make(ends, srv, persister, applyCh)
 	if snapshot {
 		snapshot := persister.ReadSnapshot()
 		if snapshot != nil && len(snapshot) > 0 {
@@ -49,7 +44,6 @@ func newRfsrv(ts *Test, srv int, ends []*labrpc.ClientEnd, persister *tester.Per
 			// ideally Raft should send it up on applyCh...
 			err := s.ingestSnap(snapshot, -1)
 			if err != "" {
-				tester.AnnotateCheckerFailureBeforeExit("failed to ingest snapshot", err)
 				ts.t.Fatal(err)
 			}
 		}
@@ -62,9 +56,7 @@ func newRfsrv(ts *Test, srv int, ends []*labrpc.ClientEnd, persister *tester.Per
 
 func (rs *rfsrv) Kill() {
 	//log.Printf("rs kill %d", rs.me)
-	rs.mu.Lock()
 	rs.raft = nil // tester will call Kill() on rs.raft
-	rs.mu.Unlock()
 	if rs.persister != nil {
 		// mimic KV server that saves its persistent state in case it
 		// restarts.
@@ -80,7 +72,7 @@ func (rs *rfsrv) GetState() (int, bool) {
 	return rs.raft.GetState()
 }
 
-func (rs *rfsrv) Raft() raftapi.Raft {
+func (rs *rfsrv) Raft() *Raft {
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
 	return rs.raft
@@ -95,7 +87,7 @@ func (rs *rfsrv) Logs(i int) (any, bool) {
 
 // applier reads message from apply ch and checks that they match the log
 // contents
-func (rs *rfsrv) applier(applyCh chan raftapi.ApplyMsg) {
+func (rs *rfsrv) applier(applyCh chan ApplyMsg) {
 	for m := range applyCh {
 		if m.CommandValid == false {
 			// ignore other types of ApplyMsg
@@ -105,7 +97,6 @@ func (rs *rfsrv) applier(applyCh chan raftapi.ApplyMsg) {
 				err_msg = fmt.Sprintf("server %v apply out of order %v", rs.me, m.CommandIndex)
 			}
 			if err_msg != "" {
-				tester.AnnotateCheckerFailureBeforeExit("apply error", err_msg)
 				log.Fatalf("apply error: %v", err_msg)
 				rs.applyErr = err_msg
 				// keep reading after error so that Raft doesn't block
@@ -116,7 +107,7 @@ func (rs *rfsrv) applier(applyCh chan raftapi.ApplyMsg) {
 }
 
 // periodically snapshot raft state
-func (rs *rfsrv) applierSnap(applyCh chan raftapi.ApplyMsg) {
+func (rs *rfsrv) applierSnap(applyCh chan ApplyMsg) {
 	if rs.raft == nil {
 		return // ???
 	}
@@ -149,18 +140,12 @@ func (rs *rfsrv) applierSnap(applyCh chan raftapi.ApplyMsg) {
 					xlog = append(xlog, rs.logs[j])
 				}
 				e.Encode(xlog)
-				start := tester.GetAnnotateTimestamp()
 				rs.raft.Snapshot(m.CommandIndex, w.Bytes())
-				details := fmt.Sprintf(
-					"snapshot created after applying the command at index %v",
-					m.CommandIndex)
-				tester.AnnotateInfoInterval(start, "snapshot created", details)
 			}
 		} else {
 			// Ignore other types of ApplyMsg.
 		}
 		if err_msg != "" {
-			tester.AnnotateCheckerFailureBeforeExit("apply error", err_msg)
 			log.Fatalf("apply error: %v", err_msg)
 			rs.applyErr = err_msg
 			// keep reading after error so that Raft doesn't block
@@ -175,7 +160,6 @@ func (rs *rfsrv) ingestSnap(snapshot []byte, index int) string {
 	defer rs.mu.Unlock()
 
 	if snapshot == nil {
-		tester.AnnotateCheckerFailureBeforeExit("failed to ingest snapshot", "nil snapshot")
 		log.Fatalf("nil snapshot")
 		return "nil snapshot"
 	}
@@ -185,8 +169,6 @@ func (rs *rfsrv) ingestSnap(snapshot []byte, index int) string {
 	var xlog []any
 	if d.Decode(&lastIncludedIndex) != nil ||
 		d.Decode(&xlog) != nil {
-		text := "failed to decode snapshot"
-		tester.AnnotateCheckerFailureBeforeExit(text, text)
 		log.Fatalf("snapshot decode error")
 		return "snapshot Decode() error"
 	}

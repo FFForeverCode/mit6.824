@@ -3,7 +3,7 @@ package shardcfg
 import (
 	"testing"
 
-	"6.5840/kvtest1"
+	"6.5840/tester1"
 )
 
 func check_same_config(t *testing.T, c1 ShardConfig, c2 ShardConfig) {
@@ -37,13 +37,13 @@ func TestBasic(t *testing.T) {
 		Gid2 = 2
 	)
 	cfg := MakeShardConfig()
-	cfg.CheckConfig(t, []kvtest.Tgid{})
+	cfg.CheckConfig(t, []tester.Tgid{})
 
-	cfg.JoinBalance(map[kvtest.Tgid][]string{Gid1: []string{"x", "y", "z"}})
-	cfg.CheckConfig(t, []kvtest.Tgid{Gid1})
+	cfg.JoinBalance(map[tester.Tgid][]string{Gid1: []string{"x", "y", "z"}})
+	cfg.CheckConfig(t, []tester.Tgid{Gid1})
 
-	cfg.JoinBalance(map[kvtest.Tgid][]string{Gid2: []string{"a", "b", "c"}})
-	cfg.CheckConfig(t, []kvtest.Tgid{Gid1, Gid2})
+	cfg.JoinBalance(map[tester.Tgid][]string{Gid2: []string{"a", "b", "c"}})
+	cfg.CheckConfig(t, []tester.Tgid{Gid1, Gid2})
 
 	sa1 := cfg.Groups[Gid1]
 	if len(sa1) != 3 || sa1[0] != "x" || sa1[1] != "y" || sa1[2] != "z" {
@@ -54,9 +54,9 @@ func TestBasic(t *testing.T) {
 		t.Fatalf("wrong servers for gid %v: %v\n", Gid2, sa2)
 	}
 
-	cfg.LeaveBalance([]kvtest.Tgid{Gid1})
-	cfg.CheckConfig(t, []kvtest.Tgid{Gid2})
+	cfg.LeaveBalance([]tester.Tgid{Gid1})
+	cfg.CheckConfig(t, []tester.Tgid{Gid2})
 
-	cfg.LeaveBalance([]kvtest.Tgid{Gid2})
-	cfg.CheckConfig(t, []kvtest.Tgid{})
+	cfg.LeaveBalance([]tester.Tgid{Gid2})
+	cfg.CheckConfig(t, []tester.Tgid{})
 }

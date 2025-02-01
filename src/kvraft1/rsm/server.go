@@ -6,9 +6,9 @@ import (
 	"sync"
 
 	"6.5840/labgob"
-	// "6.5840/kvtest1"
 	"6.5840/labrpc"
-	"6.5840/raft"
+	"6.5840/raft1"
+	"6.5840/tester1"
 )
 
 type Inc struct {
@@ -26,7 +26,7 @@ type rsmSrv struct {
 	counter int
 }
 
-func makeRsmSrv(ts *Test, srv int, ends []*labrpc.ClientEnd, persister *raft.Persister, snapshot bool) *rsmSrv {
+func makeRsmSrv(ts *Test, srv int, ends []*labrpc.ClientEnd, persister *tester.Persister, snapshot bool) *rsmSrv {
 	//log.Printf("mksrv %d", srv)
 	labgob.Register(Op{})
 	labgob.Register(Inc{})

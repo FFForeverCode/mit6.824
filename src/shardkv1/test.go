@@ -25,8 +25,9 @@ type Test struct {
 	sck  *shardctrler.ShardCtrlerClerk
 	part string
 
-	mu   sync.Mutex
-	ngid tester.Tgid
+	maxraftstate int
+	mu           sync.Mutex
+	ngid         tester.Tgid
 }
 
 const (
@@ -38,15 +39,20 @@ const (
 // Setup a kvraft group (group 0) for the shard controller and make
 // the controller clerk.
 func MakeTest(t *testing.T, part string, reliable, randomkeys bool) *Test {
-	cfg := tester.MakeConfig(t, NSRV, reliable, -1, kvraft.StartKVServer)
 	ts := &Test{
-		ngid: shardcfg.Gid1 + 1, // Gid1 is in use
-		t:    t,
+		ngid:         shardcfg.Gid1 + 1, // Gid1 is in use
+		t:            t,
+		maxraftstate: -1,
 	}
+	cfg := tester.MakeConfig(t, NSRV, reliable, ts.StartKVServerControler)
 	ts.Test = kvtest.MakeTest(t, cfg, randomkeys, ts)
 	ts.sck = ts.makeShardCtrlerClerk()
 	ts.Begin(part)
 	return ts
+}
+
+func (ts *Test) StartKVServerControler(servers []*labrpc.ClientEnd, gid tester.Tgid, me int, persister *tester.Persister) []tester.IService {
+	return kvraft.StartKVServer(servers, gid, me, persister, ts.maxraftstate)
 }
 
 func (ts *Test) MakeClerk() kvtest.IKVClerk {
@@ -102,7 +108,7 @@ func (ts *Test) groups(n int) []tester.Tgid {
 // itself to own all shards.
 func (ts *Test) setupKVService() tester.Tgid {
 	scfg := shardcfg.MakeShardConfig()
-	ts.Config.MakeGroupStart(shardcfg.Gid1, NSRV, -1, shardgrp.StartKVServer)
+	ts.Config.MakeGroupStart(shardcfg.Gid1, NSRV, ts.StartKVServerShard)
 	scfg.JoinBalance(map[tester.Tgid][]string{shardcfg.Gid1: ts.Group(shardcfg.Gid1).SrvNames()})
 	if err := ts.sck.Init(scfg); err != rpc.OK {
 		ts.t.Fatalf("Init err %v", err)
@@ -111,9 +117,13 @@ func (ts *Test) setupKVService() tester.Tgid {
 	return shardcfg.Gid1
 }
 
+func (ts *Test) StartKVServerShard(servers []*labrpc.ClientEnd, gid tester.Tgid, me int, persister *tester.Persister) []tester.IService {
+	return shardgrp.StartKVServer(servers, gid, me, persister, ts.maxraftstate)
+}
+
 func (ts *Test) joinGroups(sck *shardctrler.ShardCtrlerClerk, gids []tester.Tgid) rpc.Err {
 	for i, gid := range gids {
-		ts.Config.MakeGroupStart(gid, NSRV, -1, shardgrp.StartKVServer)
+		ts.Config.MakeGroupStart(gid, NSRV, ts.StartKVServerShard)
 		if err := sck.Join(gid, ts.Group(gid).SrvNames()); err != rpc.OK {
 			return err
 		}
@@ -141,11 +151,11 @@ func (ts *Test) checkLogs(gids []tester.Tgid) {
 	for _, gid := range gids {
 		n := ts.Group(gid).LogSize()
 		s := ts.Group(gid).SnapshotSize()
-		if ts.Group(gid).Maxraftstate >= 0 && n > 8*ts.Group(gid).Maxraftstate {
+		if ts.maxraftstate >= 0 && n > 8*ts.maxraftstate {
 			ts.t.Fatalf("persister.RaftStateSize() %v, but maxraftstate %v",
-				n, ts.Group(gid).Maxraftstate)
+				n, ts.maxraftstate)
 		}
-		if ts.Group(gid).Maxraftstate < 0 && s > 0 {
+		if ts.maxraftstate < 0 && s > 0 {
 			ts.t.Fatalf("maxraftstate is -1, but snapshot is non-empty!")
 		}
 

@@ -8,7 +8,6 @@ import (
 	"6.5840/kvsrv1/rpc"
 	"6.5840/labgob"
 	"6.5840/labrpc"
-	"6.5840/raft"
 	"6.5840/shardkv1/shardgrp/shardrpc"
 )
 
@@ -69,11 +68,6 @@ func (kv *KVServer) Kill() {
 	// Your code here, if desired.
 }
 
-// Return kv's raft struct
-func (kv *KVServer) Raft() *raft.Raft {
-	return kv.rsm.Raft()
-}
-
 func (kv *KVServer) killed() bool {
 	z := atomic.LoadInt32(&kv.dead)
 	return z == 1
@@ -81,7 +75,7 @@ func (kv *KVServer) killed() bool {
 
 // StartKVServer() and MakeRSM() must return quickly, so they should
 // start goroutines for any long-running work.
-func StartKVServer(servers []*labrpc.ClientEnd, gid tester.Tgid, me int, persister *raft.Persister, maxraftstate int) tester.IKVServer {
+func StartKVServer(servers []*labrpc.ClientEnd, gid tester.Tgid, me int, persister *tester.Persister, maxraftstate int) []tester.IService {
 	// call labgob.Register on structures you want
 	// Go's RPC library to marshall/unmarshall.
 	labgob.Register(shardrpc.PutArgs{})
@@ -95,5 +89,5 @@ func StartKVServer(servers []*labrpc.ClientEnd, gid tester.Tgid, me int, persist
 	kv.rsm = rsm.MakeRSM(servers, me, persister, maxraftstate, kv)
 
 	// Your code here
-	return kv
+	return []tester.IService{kv, kv.rsm.Raft()}
 }

@@ -1,10 +1,21 @@
 package raft
 
-// The file raftapi/raft.go defines the interface that raft must
-// expose to servers (or the tester), but see comments below for each
-// of these functions for more details.
 //
-// Make() creates a new raft peer that implements the raft interface.
+// this is an outline of the API that raft must expose to
+// the service (or tester). see comments below for
+// each of these functions for more details.
+//
+// rf = Make(...)
+//   create a new Raft server.
+// rf.Start(command interface{}) (index, term, isleader)
+//   start agreement on a new log entry
+// rf.GetState() (term, isLeader)
+//   ask a Raft for its current term, and whether it thinks it is leader
+// ApplyMsg
+//   each time a new entry is committed to the log, each Raft peer
+//   should send an ApplyMsg to the service (or tester)
+//   in the same server.
+//
 
 import (
 	//	"bytes"
@@ -15,9 +26,30 @@ import (
 
 	//	"6.5840/labgob"
 	"6.5840/labrpc"
-	"6.5840/raftapi"
 	"6.5840/tester1"
 )
+
+
+// as each Raft peer becomes aware that successive log entries are
+// committed, the peer should send an ApplyMsg to the service (or
+// tester) on the same server, via the applyCh passed to Make(). set
+// CommandValid to true to indicate that the ApplyMsg contains a newly
+// committed log entry.
+//
+// in part 3D you'll want to send other kinds of messages (e.g.,
+// snapshots) on the applyCh, but set CommandValid to false for these
+// other uses.
+type ApplyMsg struct {
+	CommandValid bool
+	Command      interface{}
+	CommandIndex int
+
+	// For 3D:
+	SnapshotValid bool
+	Snapshot      []byte
+	SnapshotTerm  int
+	SnapshotIndex int
+}
 
 // A Go object implementing a single Raft peer.
 type Raft struct {
@@ -61,6 +93,7 @@ func (rf *Raft) persist() {
 	// rf.persister.Save(raftstate, nil)
 }
 
+
 // restore previously persisted state.
 func (rf *Raft) readPersist(data []byte) {
 	if data == nil || len(data) < 1 { // bootstrap without any state?
@@ -81,12 +114,6 @@ func (rf *Raft) readPersist(data []byte) {
 	// }
 }
 
-// how many bytes in Raft's persisted log?
-func (rf *Raft) PersistBytes() int {
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
-	return rf.persister.RaftStateSize()
-}
 
 // the service says it has created a snapshot that has
 // all info up to and including index. this means the
@@ -96,6 +123,7 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 	// Your code here (3D).
 
 }
+
 
 // example RequestVote RPC arguments structure.
 // field names must start with capital letters!
@@ -146,6 +174,7 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 	return ok
 }
 
+
 // the service using Raft (e.g. a k/v server) wants to start
 // agreement on the next command to be appended to Raft's log. if this
 // server isn't the leader, returns false. otherwise start the
@@ -164,6 +193,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	isLeader := true
 
 	// Your code here (3B).
+
 
 	return index, term, isLeader
 }
@@ -193,6 +223,7 @@ func (rf *Raft) ticker() {
 		// Your code here (3A)
 		// Check if a leader election should be started.
 
+
 		// pause for a random amount of time between 50 and 350
 		// milliseconds.
 		ms := 50 + (rand.Int63() % 300)
@@ -210,7 +241,7 @@ func (rf *Raft) ticker() {
 // Make() must return quickly, so it should start goroutines
 // for any long-running work.
 func Make(peers []*labrpc.ClientEnd, me int,
-	persister *tester.Persister, applyCh chan raftapi.ApplyMsg) raftapi.Raft {
+	persister *tester.Persister, applyCh chan ApplyMsg) *Raft {
 	rf := &Raft{}
 	rf.peers = peers
 	rf.persister = persister
@@ -223,6 +254,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 
 	// start ticker goroutine to start elections
 	go rf.ticker()
+
 
 	return rf
 }

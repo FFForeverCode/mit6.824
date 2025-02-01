@@ -178,7 +178,8 @@ func TestOnePartition4A(t *testing.T) {
 
 	ver0 := ts.PutAtLeastOnce(ck, "1", "13", rpc.Tversion(0), -1)
 
-	p1, p2 := ts.Group(Gid).MakePartition()
+	_, l := ts.Leader()
+	p1, p2 := ts.Group(Gid).MakePartition(l)
 	ts.Group(Gid).Partition(p1, p2)
 
 	ckp1 := ts.MakeClerkTo(p1)  // connect ckp1 to p1
