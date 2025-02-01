@@ -45,12 +45,12 @@ func (kv *KVServer) Put(args *rpc.PutArgs, reply *rpc.PutReply) {
 	// Your code here.
 }
 
-// You can ignore for this lab
+// You can ignore Kill() for this lab
 func (kv *KVServer) Kill() {
 }
 
 
-// You can ignore all arguments; they are for replicated KVservers in lab 4
+// You can ignore all arguments; they are for replicated KVservers
 func StartKVServer(ends []*labrpc.ClientEnd, gid tester.Tgid, srv int, persister *tester.Persister) []tester.IService {
 	kv := MakeKVServer()
 	return []tester.IService{kv}
