@@ -4,11 +4,12 @@ import (
 	crand "crypto/rand"
 	"encoding/base64"
 	"fmt"
-	// "log"
+	//"log"
 	"math/big"
 	"math/rand"
 	"runtime"
-	"runtime/debug"
+	// "runtime/debug"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -137,8 +138,27 @@ func (cfg *Config) End() {
 }
 
 func (cfg *Config) Fatalf(format string, args ...any) {
-	debug.PrintStack()
-	cfg.t.Fatalf(format, args...)
+	const maxStackLen = 50
+	fmt.Printf("Fatal: ")
+	fmt.Printf(format, args...)
+	fmt.Println("")
+	var pc [maxStackLen]uintptr
+	// Skip two extra frames to account for this function
+	// and runtime.Callers itself.
+	n := runtime.Callers(2, pc[:])
+	if n == 0 {
+		panic("testing: zero callers found")
+	}
+	frames := runtime.CallersFrames(pc[:n])
+	var frame runtime.Frame
+	for more := true; more; {
+		frame, more = frames.Next()
+		// Print only frames in our test files
+		if strings.Contains(frame.File, "test.go") {
+			fmt.Printf("        %v:%d\n", frame.File, frame.Line)
+		}
+	}
+	cfg.t.FailNow()
 }
 
 func Randstring(n int) string {

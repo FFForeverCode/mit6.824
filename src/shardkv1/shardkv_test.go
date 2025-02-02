@@ -33,10 +33,10 @@ func TestStaticOneShardGroup5A(t *testing.T) {
 	// Read the initial configuration and check it
 	cfg, v, err := sck.Query()
 	if err != rpc.OK {
-		ts.Fatalf("Query failed %v", err)
+		ts.t.Fatalf("Query failed %v", err)
 	}
 	if v != 1 || cfg.Num != 1 || cfg.Shards[0] != shardcfg.Gid1 {
-		ts.Fatalf("Static wrong %v %v", cfg, v)
+		ts.t.Fatalf("Static wrong %v %v", cfg, v)
 	}
 	cfg.CheckConfig(t, []tester.Tgid{shardcfg.Gid1})
 

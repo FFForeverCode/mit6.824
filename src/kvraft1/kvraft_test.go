@@ -99,7 +99,7 @@ func (ts *Test) GenericTest() {
 			// requests and had time to checkpoint.
 			sz := ts.Config.Group(Gid).LogSize()
 			if sz > 8*ts.maxraftstate {
-				ts.Fatalf("logs were not trimmed (%v > 8*%v)", sz, ts.maxraftstate)
+				ts.t.Fatalf("logs were not trimmed (%v > 8*%v)", sz, ts.maxraftstate)
 			}
 		}
 		if ts.maxraftstate < 0 {

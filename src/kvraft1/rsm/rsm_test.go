@@ -14,7 +14,7 @@ func TestBasic(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		r := ts.one()
 		if r.N != i+1 {
-			ts.Fatalf("expected %d instead of %d", i, r.N)
+			ts.t.Fatalf("expected %d instead of %d", i, r.N)
 		}
 		ts.checkCounter(r.N, NSRV)
 	}
