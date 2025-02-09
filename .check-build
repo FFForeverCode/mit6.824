@@ -3,6 +3,12 @@
 set -eu
 
 REFERENCE_FILES=(
+    # misc
+    src/labgob/labgob.go
+    src/labgob/test_test.go
+    src/labrpc/labrpc.go
+    src/labrpc/test_test.go
+
     # lab 1
     src/mrapps/crash.go
     src/mrapps/indexer.go
@@ -15,26 +21,37 @@ REFERENCE_FILES=(
     src/main/mrworker.go
 
     # lab 2
-    src/kvsrv/test_test.go
-    src/kvsrv/config.go
+    src/kvsrv1/lock/lock_test.go
+    src/kvsrv1/kvsrv_test.go
+    src/kvsrv1/test.go
+    src/kvtest1/kvtest.go
+    src/kvtest1/porcupine.go
 
     # lab 3
-    src/raft/persister.go
-    src/raft/test_test.go
-    src/raft/config.go
-    src/labrpc/labrpc.go
+    src/raft1/raft_test.go
+    src/raft1/server.go
+    src/raft1/test.go
+    src/tester1/clnts.go
+    src/tester1/config.go
+    src/tester1/group.go
+    src/tester1/persister.go
+    src/tester1/srv.go
 
     # lab 4
-    src/kvraft/test_test.go
-    src/kvraft/config.go
+    src/kvraft1/rsm/rsm_test.go
+    src/kvraft1/rsm/server.go
+    src/kvraft1/rsm/test.go
+    src/kvraft1/kvraft_test.go
+    src/kvraft1/test.go
+    src/models1/kv.go
 
     # lab 5a
-    src/shardctrler/test_test.go
-    src/shardctrler/config.go
+    src/shardkv1/test.go
+    src/shardkv1/shardctrler/lock/lock.go
 
     # lab 5b
-    src/shardkv/test_test.go
-    src/shardkv/config.go
+    src/shardkv1/shardkv_test.go
+    src/shardkv1/shardcfg/shardcfg_test.go
 )
 
 main() {
@@ -91,22 +108,22 @@ check_lab2() {
 }
 
 check_lab3() {
-    check_cmd cd src/raft
+    check_cmd cd src/raft1
     check_cmd go test -c
 }
 
 check_lab4() {
-    check_cmd cd src/kvraft
+    check_cmd cd src/kvraft1
     check_cmd go test -c
 }
 
 check_lab5a() {
-    check_cmd cd src/shardctrler
+    check_cmd cd src/shardctrler1
     check_cmd go test -c
 }
 
 check_lab5b() {
-    check_cmd cd src/shardkv
+    check_cmd cd src/shardkv1
     check_cmd go test -c
     # also check other labs/parts
     cd "$tmpdir"
