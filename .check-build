@@ -15,11 +15,8 @@ REFERENCE_FILES=(
     src/main/mrworker.go
 
     # lab 2
-    src/kvsrv1/lock/lock_test.go
-    src/kvsrv1/kvsrv_test.go
-    src/kvsrv1/test.go
-    src/kvtest1/kvtest.go
-    src/kvtest1/porcupine.go
+    src/kvsrv/test_test.go
+    src/kvsrv/config.go
 
     # lab 3
     src/raft/persister.go
@@ -89,7 +86,7 @@ check_lab1() {
 }
 
 check_lab2() {
-    check_cmd cd src/kvsrv
+    check_cmd cd src/kvsrv1
     check_cmd go test -c
 }
 
