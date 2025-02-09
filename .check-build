@@ -15,8 +15,11 @@ REFERENCE_FILES=(
     src/main/mrworker.go
 
     # lab 2
-    src/kvsrv/test_test.go
-    src/kvsrv/config.go
+    src/kvsrv1/lock/lock_test.go
+    src/kvsrv1/kvsrv_test.go
+    src/kvsrv1/test.go
+    src/kvtest1/kvtest.go
+    src/kvtest1/porcupine.go
 
     # lab 3
     src/raft/persister.go

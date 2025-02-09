@@ -40,7 +40,7 @@ func (kv *KVServer) Get(args *rpc.GetArgs, reply *rpc.GetReply) {
 // Update the value for a key if args.Version matches the version of
 // the key on the server. If versions don't match, return ErrVersion.
 // If the key doesn't exist, Put installs the value if the
-// Args.Version is 0.
+// args.Version is 0, and returns ErrNoKey otherwise.
 func (kv *KVServer) Put(args *rpc.PutArgs, reply *rpc.PutReply) {
 	// Your code here.
 }

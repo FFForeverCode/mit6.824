@@ -41,7 +41,13 @@ func makeRsmSrv(ts *Test, srv int, ends []*labrpc.ClientEnd, persister *tester.P
 
 func (rs *rsmSrv) DoOp(req any) any {
 	//log.Printf("%d: DoOp: %v", rs.me, req)
+	if _, ok := req.(Inc); ok == false {
+		// wrong type! expecting an Inc.
+		log.Fatalf("DoOp called with the wrong type")
+	}
+	rs.mu.Lock()
 	rs.counter += 1
+	rs.mu.Unlock()
 	return &Rep{rs.counter}
 }
 

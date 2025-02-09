@@ -16,6 +16,7 @@ import (
 // (much more than the paper's range of timeouts).
 const ElectionTimeout = 1 * time.Second
 
+// n specifies the length of the string to be generated.
 func RandValue(n int) string {
 	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 

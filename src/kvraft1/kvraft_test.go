@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"6.5840/kvraft1/rsm"
 	"6.5840/kvsrv1/rpc"
 	"6.5840/kvtest1"
 )
@@ -147,38 +148,38 @@ func (ts *Test) GenericTestSpeed() {
 	}
 }
 
-func TestBasic4A(t *testing.T) {
-	ts := MakeTest(t, "4A basic", 1, 5, true, false, false, -1, false)
+func TestBasic4B(t *testing.T) {
+	ts := MakeTest(t, "4B basic", 1, 5, true, false, false, -1, false)
 	ts.GenericTest()
 }
 
-func TestSpeed4A(t *testing.T) {
-	ts := MakeTest(t, "4A speed", 1, 3, true, false, false, -1, false)
+func TestSpeed4B(t *testing.T) {
+	ts := MakeTest(t, "4B speed", 1, 3, true, false, false, -1, false)
 	ts.GenericTestSpeed()
 }
 
-func TestConcurrent4A(t *testing.T) {
-	ts := MakeTest(t, "4A many clients", 5, 5, true, false, false, -1, false)
+func TestConcurrent4B(t *testing.T) {
+	ts := MakeTest(t, "4B many clients", 5, 5, true, false, false, -1, false)
 	ts.GenericTest()
 }
 
-func TestUnreliable4A(t *testing.T) {
-	ts := MakeTest(t, "4A unreliable net, many clients", 5, 5, false, false, false, -1, false)
+func TestUnreliable4B(t *testing.T) {
+	ts := MakeTest(t, "4B unreliable net, many clients", 5, 5, false, false, false, -1, false)
 	ts.GenericTest()
 }
 
 // Submit a request in the minority partition and check that the requests
 // doesn't go through until the partition heals.  The leader in the original
 // network ends up in the minority partition.
-func TestOnePartition4A(t *testing.T) {
-	ts := MakeTest(t, "4A progress in majority", 0, 5, false, false, false, -1, false)
+func TestOnePartition4B(t *testing.T) {
+	ts := MakeTest(t, "4B progress in majority", 0, 5, false, false, false, -1, false)
 	defer ts.Cleanup()
 
 	ck := ts.MakeClerk()
 
 	ver0 := ts.PutAtLeastOnce(ck, "1", "13", rpc.Tversion(0), -1)
 
-	_, l := ts.Leader()
+	_, l := rsm.Leader(ts.Config, Gid)
 	p1, p2 := ts.Group(Gid).MakePartition(l)
 	ts.Group(Gid).Partition(p1, p2)
 
@@ -194,7 +195,7 @@ func TestOnePartition4A(t *testing.T) {
 	done0 := make(chan rpc.Tversion)
 	done1 := make(chan rpc.Tversion)
 
-	ts.Begin("Test: no progress in minority (4A)")
+	ts.Begin("Test: no progress in minority (4B)")
 	go func() {
 		ver := ts.PutAtLeastOnce(ckp2a, "1", "15", ver1+1, -1)
 		done0 <- ver
@@ -218,7 +219,7 @@ func TestOnePartition4A(t *testing.T) {
 
 	ts.End()
 
-	ts.Begin("Test: completion after heal (4A)")
+	ts.Begin("Test: completion after heal (4B)")
 
 	ts.Group(Gid).ConnectAll()
 	ckp2a.(*kvtest.TestClerk).Clnt.ConnectAll()
@@ -242,43 +243,43 @@ func TestOnePartition4A(t *testing.T) {
 	ts.CheckGet(ck, "1", "15", ver2+1)
 }
 
-func TestManyPartitionsOneClient4A(t *testing.T) {
-	ts := MakeTest(t, "4A partitions, one client", 1, 5, false, false, true, -1, false)
+func TestManyPartitionsOneClient4B(t *testing.T) {
+	ts := MakeTest(t, "4B partitions, one client", 1, 5, false, false, true, -1, false)
 	ts.GenericTest()
 }
 
-func TestManyPartitionsManyClients4A(t *testing.T) {
-	ts := MakeTest(t, "4A partitions, many clients (4A)", 5, 5, false, false, true, -1, false)
+func TestManyPartitionsManyClients4B(t *testing.T) {
+	ts := MakeTest(t, "4B partitions, many clients (4B)", 5, 5, false, false, true, -1, false)
 	ts.GenericTest()
 }
 
-func TestPersistOneClient4A(t *testing.T) {
-	ts := MakeTest(t, "4A restarts, one client 4A ", 1, 5, false, true, false, -1, false)
+func TestPersistOneClient4B(t *testing.T) {
+	ts := MakeTest(t, "4B restarts, one client 4B ", 1, 5, false, true, false, -1, false)
 	ts.GenericTest()
 }
 
-func TestPersistConcurrent4A(t *testing.T) {
-	ts := MakeTest(t, "4A restarts, many clients", 5, 5, false, true, false, -1, false)
+func TestPersistConcurrent4B(t *testing.T) {
+	ts := MakeTest(t, "4B restarts, many clients", 5, 5, false, true, false, -1, false)
 	ts.GenericTest()
 }
 
-func TestPersistConcurrentUnreliable4A(t *testing.T) {
-	ts := MakeTest(t, "4A unreliable net, restarts, many clients ", 5, 5, true, true, false, -1, false)
+func TestPersistConcurrentUnreliable4B(t *testing.T) {
+	ts := MakeTest(t, "4B unreliable net, restarts, many clients ", 5, 5, true, true, false, -1, false)
 	ts.GenericTest()
 }
 
-func TestPersistPartition4A(t *testing.T) {
-	ts := MakeTest(t, "4A restarts, partitions, many clients", 5, 5, false, true, true, -1, false)
+func TestPersistPartition4B(t *testing.T) {
+	ts := MakeTest(t, "4B restarts, partitions, many clients", 5, 5, false, true, true, -1, false)
 	ts.GenericTest()
 }
 
-func TestPersistPartitionUnreliable4A(t *testing.T) {
-	ts := MakeTest(t, "4A unreliable net, restarts, partitions, many clients", 5, 5, true, true, true, -1, false)
+func TestPersistPartitionUnreliable4B(t *testing.T) {
+	ts := MakeTest(t, "4B unreliable net, restarts, partitions, many clients", 5, 5, true, true, true, -1, false)
 	ts.GenericTest()
 }
 
-func TestPersistPartitionUnreliableLinearizable4A(t *testing.T) {
-	ts := MakeTest(t, "4A unreliable net, restarts, partitions, random keys, many clients", 15, 7, true, true, true, -1, true)
+func TestPersistPartitionUnreliableLinearizable4B(t *testing.T) {
+	ts := MakeTest(t, "4B unreliable net, restarts, partitions, random keys, many clients", 15, 7, true, true, true, -1, true)
 	ts.GenericTest()
 }
 
@@ -286,13 +287,13 @@ func TestPersistPartitionUnreliableLinearizable4A(t *testing.T) {
 // recover by using the InstallSnapshot RPC?
 // also checks that majority discards committed log entries
 // even if minority doesn't respond.
-func TestSnapshotRPC4B(t *testing.T) {
-	ts := MakeTest(t, "4B SnapshotsRPC", 0, 3, false, false, false, 1000, false)
+func TestSnapshotRPC4C(t *testing.T) {
+	ts := MakeTest(t, "4C SnapshotsRPC", 0, 3, false, false, false, 1000, false)
 	defer ts.Cleanup()
 
 	ck := ts.MakeClerk()
 
-	ts.Begin("Test: InstallSnapshot RPC (4B)")
+	ts.Begin("Test: InstallSnapshot RPC (4C)")
 
 	vera := ts.PutAtLeastOnce(ck, "a", "A", rpc.Tversion(0), -1)
 	ts.CheckGet(ck, "a", "A", vera)
@@ -340,8 +341,8 @@ func TestSnapshotRPC4B(t *testing.T) {
 
 // are the snapshots not too huge? 500 bytes is a generous bound for the
 // operations we're doing here.
-func TestSnapshotSize4B(t *testing.T) {
-	ts := MakeTest(t, "4B snapshot size is reasonable", 0, 3, false, false, false, 1000, false)
+func TestSnapshotSize4C(t *testing.T) {
+	ts := MakeTest(t, "4C snapshot size is reasonable", 0, 3, false, false, false, 1000, false)
 	defer ts.Cleanup()
 
 	maxsnapshotstate := 500
@@ -370,37 +371,37 @@ func TestSnapshotSize4B(t *testing.T) {
 	}
 }
 
-func TestSpeed4B(t *testing.T) {
-	ts := MakeTest(t, "4B speed", 1, 3, true, false, false, 1000, false)
+func TestSpeed4C(t *testing.T) {
+	ts := MakeTest(t, "4C speed", 1, 3, true, false, false, 1000, false)
 	ts.GenericTestSpeed()
 }
 
-func TestSnapshotRecover4B(t *testing.T) {
-	ts := MakeTest(t, "4B restarts, snapshots, one client", 1, 5, true, true, false, 1000, false)
+func TestSnapshotRecover4C(t *testing.T) {
+	ts := MakeTest(t, "4C restarts, snapshots, one client", 1, 5, true, true, false, 1000, false)
 	ts.GenericTest()
 }
 
-func TestSnapshotRecoverManyClients4B(t *testing.T) {
-	ts := MakeTest(t, "4B restarts, snapshots, many clients ", 20, 5, true, true, false, 1000, false)
+func TestSnapshotRecoverManyClients4C(t *testing.T) {
+	ts := MakeTest(t, "4C restarts, snapshots, many clients ", 20, 5, true, true, false, 1000, false)
 	ts.GenericTest()
 }
 
-func TestSnapshotUnreliable4B(t *testing.T) {
-	ts := MakeTest(t, "4B unreliable net, snapshots, many clients", 5, 5, false, false, false, 1000, false)
+func TestSnapshotUnreliable4C(t *testing.T) {
+	ts := MakeTest(t, "4C unreliable net, snapshots, many clients", 5, 5, false, false, false, 1000, false)
 	ts.GenericTest()
 }
 
-func TestSnapshotUnreliableRecover4B(t *testing.T) {
-	ts := MakeTest(t, "4B unreliable net, restarts, snapshots, many clients", 5, 5, false, true, false, 1000, false)
+func TestSnapshotUnreliableRecover4C(t *testing.T) {
+	ts := MakeTest(t, "4C unreliable net, restarts, snapshots, many clients", 5, 5, false, true, false, 1000, false)
 	ts.GenericTest()
 }
 
-func TestSnapshotUnreliableRecoverConcurrentPartition4B(t *testing.T) {
-	ts := MakeTest(t, "4B unreliable net, restarts, partitions, snapshots, many clients", 5, 5, false, true, true, 1000, false)
+func TestSnapshotUnreliableRecoverConcurrentPartition4C(t *testing.T) {
+	ts := MakeTest(t, "4C unreliable net, restarts, partitions, snapshots, many clients", 5, 5, false, true, true, 1000, false)
 	ts.GenericTest()
 }
 
-func TestSnapshotUnreliableRecoverConcurrentPartitionLinearizable4B(t *testing.T) {
-	ts := MakeTest(t, "4B unreliable net, restarts, partitions, snapshots, random keys, many clients", 15, 7, false, true, true, 1000, true)
+func TestSnapshotUnreliableRecoverConcurrentPartitionLinearizable4C(t *testing.T) {
+	ts := MakeTest(t, "4C unreliable net, restarts, partitions, snapshots, random keys, many clients", 15, 7, false, true, true, 1000, true)
 	ts.GenericTest()
 }

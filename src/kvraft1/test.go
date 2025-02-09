@@ -5,7 +5,6 @@ import (
 
 	"6.5840/kvtest1"
 	"6.5840/labrpc"
-	"6.5840/raft1"
 	"6.5840/tester1"
 )
 
@@ -49,22 +48,6 @@ func (ts *Test) MakeClerk() kvtest.IKVClerk {
 	clnt := ts.Config.MakeClient()
 	ck := MakeClerk(clnt, ts.Group(Gid).SrvNames())
 	return &kvtest.TestClerk{ck, clnt}
-}
-
-func (ts *Test) Leader() (bool, int) {
-	for i, ss := range ts.Group(Gid).Services() {
-		for _, s := range ss {
-			switch r := s.(type) {
-			case *raft.Raft:
-				_, is_leader := r.GetState()
-				if is_leader {
-					return true, i
-				}
-			default:
-			}
-		}
-	}
-	return false, 0
 }
 
 func (ts *Test) DeleteClerk(ck kvtest.IKVClerk) {

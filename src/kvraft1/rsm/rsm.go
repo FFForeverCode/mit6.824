@@ -70,15 +70,11 @@ func (rsm *RSM) Raft() *raft.Raft {
 
 // submit a command to Raft,
 // and wait for it to be committed.
-// perform() will tell us via ClientStatus and lastApplied
-// when our command is either executed or not.
 //
 // returns (executeError, executeResult)
 // if executeError==ErrWrongLeader, client should find new leader
 // and try again.
 func (rsm *RSM) Submit(req any) (rpc.Err, any) {
-	rsm.mu.Lock()
-	defer rsm.mu.Unlock()
 
 	// Submit creates an Op structure to run a command through Raft;
 	// for example: op := Op{Id: rsm.nextId, Req: req}, where req is
