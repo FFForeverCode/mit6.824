@@ -8,6 +8,7 @@ REFERENCE_FILES=(
     src/labgob/test_test.go
     src/labrpc/labrpc.go
     src/labrpc/test_test.go
+    src/models1/kv.go
 
     # lab 1
     src/mrapps/crash.go
@@ -43,11 +44,9 @@ REFERENCE_FILES=(
     src/kvraft1/rsm/test.go
     src/kvraft1/kvraft_test.go
     src/kvraft1/test.go
-    src/models1/kv.go
 
     # lab 5a
     src/shardkv1/test.go
-    src/shardkv1/shardctrler/lock/lock.go
 
     # lab 5b
     src/shardkv1/shardkv_test.go

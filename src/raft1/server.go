@@ -56,7 +56,9 @@ func newRfsrv(ts *Test, srv int, ends []*labrpc.ClientEnd, persister *tester.Per
 
 func (rs *rfsrv) Kill() {
 	//log.Printf("rs kill %d", rs.me)
+	rs.mu.Lock()
 	rs.raft = nil // tester will call Kill() on rs.raft
+	rs.mu.Unlock()
 	if rs.persister != nil {
 		// mimic KV server that saves its persistent state in case it
 		// restarts.

@@ -49,7 +49,9 @@ func (ts *Test) cleanup() {
 
 func (ts *Test) mksrv(ends []*labrpc.ClientEnd, grp tester.Tgid, srv int, persister *tester.Persister) []tester.IService {
 	s := newRfsrv(ts, srv, ends, persister, ts.snapshot)
+	ts.mu.Lock()
 	ts.srvs[srv] = s
+	ts.mu.Unlock()
 	return []tester.IService{s, s.raft}
 }
 

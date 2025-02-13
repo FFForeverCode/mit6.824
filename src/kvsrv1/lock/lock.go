@@ -16,7 +16,8 @@ type Lock struct {
 // The tester calls MakeLock() and passes in a k/v clerk; your code can
 // perform a Put or Get by calling lk.ck.Put() or lk.ck.Get().
 //
-// l is the key protected by the lock to be created.
+// Use l as the key to store the "lock state" (you would have to decide
+// precisely what the lock state is).
 func MakeLock(ck kvtest.IKVClerk, l string) *Lock {
 	lk := &Lock{ck: ck}
 	// You may add code here
