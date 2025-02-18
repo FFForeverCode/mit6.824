@@ -7,7 +7,7 @@ import (
 
 	"6.5840/kvsrv1/rpc"
 	"6.5840/labrpc"
-	"6.5840/raft1"
+	"6.5840/raftapi"
 	"6.5840/tester1"
 )
 
@@ -135,7 +135,7 @@ func Leader(cfg *tester.Config, gid tester.Tgid) (bool, int) {
 	for i, ss := range cfg.Group(gid).Services() {
 		for _, s := range ss {
 			switch r := s.(type) {
-			case *raft.Raft:
+			case raftapi.Raft:
 				_, isLeader := r.GetState()
 				if isLeader {
 					return true, i

@@ -8,12 +8,17 @@ import (
 
 	"6.5840/labgob"
 	"6.5840/labrpc"
+	"6.5840/raftapi"
 	"6.5840/tester1"
+
 )
 
 const (
 	SnapShotInterval = 10
 )
+
+var useRaftStateMachine bool // to plug in another raft besided raft1
+
 
 type rfsrv struct {
 	ts          *Test
@@ -23,7 +28,7 @@ type rfsrv struct {
 	persister   *tester.Persister
 
 	mu   sync.Mutex
-	raft *Raft
+	raft raftapi.Raft
 	logs map[int]any // copy of each server's committed entries
 }
 
@@ -35,8 +40,10 @@ func newRfsrv(ts *Test, srv int, ends []*labrpc.ClientEnd, persister *tester.Per
 		logs:      map[int]any{},
 		persister: persister,
 	}
-	applyCh := make(chan ApplyMsg)
-	s.raft = Make(ends, srv, persister, applyCh)
+	applyCh := make(chan raftapi.ApplyMsg)
+	if !useRaftStateMachine {
+		s.raft = Make(ends, srv, persister, applyCh)
+	}
 	if snapshot {
 		snapshot := persister.ReadSnapshot()
 		if snapshot != nil && len(snapshot) > 0 {
@@ -74,7 +81,7 @@ func (rs *rfsrv) GetState() (int, bool) {
 	return rs.raft.GetState()
 }
 
-func (rs *rfsrv) Raft() *Raft {
+func (rs *rfsrv) Raft() raftapi.Raft {
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
 	return rs.raft
@@ -89,7 +96,7 @@ func (rs *rfsrv) Logs(i int) (any, bool) {
 
 // applier reads message from apply ch and checks that they match the log
 // contents
-func (rs *rfsrv) applier(applyCh chan ApplyMsg) {
+func (rs *rfsrv) applier(applyCh chan raftapi.ApplyMsg) {
 	for m := range applyCh {
 		if m.CommandValid == false {
 			// ignore other types of ApplyMsg
@@ -109,7 +116,7 @@ func (rs *rfsrv) applier(applyCh chan ApplyMsg) {
 }
 
 // periodically snapshot raft state
-func (rs *rfsrv) applierSnap(applyCh chan ApplyMsg) {
+func (rs *rfsrv) applierSnap(applyCh chan raftapi.ApplyMsg) {
 	if rs.raft == nil {
 		return // ???
 	}

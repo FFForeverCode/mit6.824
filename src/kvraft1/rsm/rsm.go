@@ -6,9 +6,13 @@ import (
 	"6.5840/kvsrv1/rpc"
 	"6.5840/labrpc"
 	"6.5840/raft1"
+	"6.5840/raftapi"
 	"6.5840/tester1"
 
 )
+
+var useRaftStateMachine bool // to plug in another raft besided raft1
+
 
 type Op struct {
 	// Your definitions here.
@@ -32,8 +36,8 @@ type StateMachine interface {
 type RSM struct {
 	mu           sync.Mutex
 	me           int
-	rf           *raft.Raft
-	applyCh      chan raft.ApplyMsg
+	rf           raftapi.Raft
+	applyCh      chan raftapi.ApplyMsg
 	maxraftstate int // snapshot if log grows this big
 	sm           StateMachine
 	// Your definitions here.
@@ -56,24 +60,23 @@ func MakeRSM(servers []*labrpc.ClientEnd, me int, persister *tester.Persister, m
 	rsm := &RSM{
 		me:           me,
 		maxraftstate: maxraftstate,
-		applyCh:      make(chan raft.ApplyMsg),
+		applyCh:      make(chan raftapi.ApplyMsg),
 		sm:           sm,
 	}
-	rsm.rf = raft.Make(servers, me, persister, rsm.applyCh)
+	if !useRaftStateMachine {
+		rsm.rf = raft.Make(servers, me, persister, rsm.applyCh)
+	}
 	return rsm
 }
 
-func (rsm *RSM) Raft() *raft.Raft {
+func (rsm *RSM) Raft() raftapi.Raft {
 	return rsm.rf
 }
 
 
-// submit a command to Raft,
-// and wait for it to be committed.
-//
-// returns (executeError, executeResult)
-// if executeError==ErrWrongLeader, client should find new leader
-// and try again.
+// Submit a command to Raft, and wait for it to be committed.  It
+// should return ErrWrongLeader if client should find new leader and
+// try again.
 func (rsm *RSM) Submit(req any) (rpc.Err, any) {
 
 	// Submit creates an Op structure to run a command through Raft;

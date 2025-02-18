@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"6.5840/labrpc"
+	"6.5840/raftapi"
 	"6.5840/tester1"
 )
 
@@ -107,7 +108,7 @@ func (ts *Test) checkTerms() int {
 	return term
 }
 
-func (ts *Test) checkLogs(i int, m ApplyMsg) (string, bool) {
+func (ts *Test) checkLogs(i int, m raftapi.ApplyMsg) (string, bool) {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
 
@@ -189,7 +190,7 @@ func (ts *Test) one(cmd any, expectedServers int, retry bool) int {
 		index := -1
 		for range ts.srvs {
 			starts = (starts + 1) % len(ts.srvs)
-			var rf *Raft
+			var rf raftapi.Raft
 			if ts.g.IsConnected(starts) {
 				rf = ts.srvs[starts].raft
 			}

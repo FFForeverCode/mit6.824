@@ -2,7 +2,7 @@ package kvtest
 
 import (
 	"encoding/json"
-	// "log"
+	//"log"
 	"math/rand"
 	"strconv"
 	"testing"
@@ -76,12 +76,21 @@ func (ts *Test) MakeClerk() IKVClerk {
 	return ts.mck.MakeClerk()
 }
 
+// Assumes different ck's put to different keys
 func (ts *Test) PutAtLeastOnce(ck IKVClerk, key, value string, ver rpc.Tversion, me int) rpc.Tversion {
 	for true {
-		if err := ts.Put(ck, key, value, ver, me); err == rpc.OK {
+		err := ts.Put(ck, key, value, ver, me)
+		if err == rpc.OK {
 			break
 		}
-		ver += 1
+		if err == rpc.ErrMaybe || err == rpc.ErrVersion {
+			ver += 1
+		} else {
+			// if failed with ver = 0, retry
+			if ver != 0 { // check that ver is indeed 0
+				ts.Fatalf("Put %v ver %d err %v", key, ver, err)
+			}
+		}
 	}
 	return ver
 }

@@ -1,7 +1,7 @@
 package kvraft
 
 import (
-	// "log"
+	//"log"
 	"strconv"
 	"testing"
 	"time"
@@ -288,7 +288,11 @@ func TestPersistPartitionUnreliableLinearizable4B(t *testing.T) {
 // also checks that majority discards committed log entries
 // even if minority doesn't respond.
 func TestSnapshotRPC4C(t *testing.T) {
-	ts := MakeTest(t, "4C SnapshotsRPC", 0, 3, false, false, false, 1000, false)
+	const (
+		NSRV         = 3
+		MAXRAFTSTATE = 1000
+	)
+	ts := MakeTest(t, "4C SnapshotsRPC", 0, NSRV, false, false, false, MAXRAFTSTATE, false)
 	defer ts.Cleanup()
 
 	ck := ts.MakeClerk()
@@ -304,10 +308,10 @@ func TestSnapshotRPC4C(t *testing.T) {
 	{
 		ck1 := ts.MakeClerkTo([]int{0, 1})
 		for i := 0; i < 50; i++ {
-			verb = ts.PutAtLeastOnce(ck1, strconv.Itoa(i), strconv.Itoa(i), rpc.Tversion(0), -1)
+			ts.PutAtLeastOnce(ck1, strconv.Itoa(i), strconv.Itoa(i), rpc.Tversion(0), -1)
 		}
 		time.Sleep(kvtest.ElectionTimeout)
-		verb = ts.PutAtLeastOnce(ck1, "b", "B", verb, -1)
+		verb = ts.PutAtLeastOnce(ck1, "b", "B", rpc.Tversion(0), -1)
 	}
 
 	// check that the majority partition has thrown away

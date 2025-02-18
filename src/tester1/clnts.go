@@ -2,7 +2,6 @@ package tester
 
 import (
 	//"log"
-	"os"
 	"sync"
 
 	"6.5840/labrpc"
@@ -98,7 +97,7 @@ func (clnt *Clnt) remove() {
 	defer clnt.mu.Unlock()
 
 	for _, e := range clnt.ends {
-		os.Remove(e.name)
+		clnt.net.DeleteEnd(e.name)
 	}
 }
 
@@ -142,12 +141,15 @@ func (clnts *Clnts) cleanup() {
 	for clnt, _ := range clnts.clerks {
 		clnt.remove()
 	}
+	clnts.clerks = nil
 }
 
 func (clnts *Clnts) DeleteClient(clnt *Clnt) {
 	clnts.mu.Lock()
 	defer clnts.mu.Unlock()
 
-	clnt.remove()
-	delete(clnts.clerks, clnt)
+	if _, ok := clnts.clerks[clnt]; ok {
+		clnt.remove()
+		delete(clnts.clerks, clnt)
+	}
 }
