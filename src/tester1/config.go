@@ -79,6 +79,11 @@ func (cfg *Config) Cleanup() {
 	cfg.Clnts.cleanup()
 	cfg.Groups.cleanup()
 	cfg.net.Cleanup()
+	if cfg.t.Failed() {
+		annotation.cleanup(true, "test failed")
+	} else {
+		annotation.cleanup(false, "test passed")
+	}
 	cfg.CheckTimeout()
 }
 

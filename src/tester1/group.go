@@ -194,6 +194,10 @@ func (sg *ServerGrp) IsConnected(i int) bool {
 	return sg.connected[i]
 }
 
+func (sg *ServerGrp) GetConnected() []bool {
+	return sg.connected
+}
+
 // Maximum log size across all servers
 func (sg *ServerGrp) LogSize() int {
 	logsize := 0

@@ -37,6 +37,7 @@ REFERENCE_FILES=(
     src/tester1/group.go
     src/tester1/persister.go
     src/tester1/srv.go
+    src/tester1/annotation.go
 
     # lab 4
     src/kvraft1/rsm/rsm_test.go

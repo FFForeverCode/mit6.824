@@ -62,6 +62,7 @@ func (ts *Test) restart(i int) {
 }
 
 func (ts *Test) checkOneLeader() int {
+	tester.AnnotateCheckerBegin("checking for a single leader")
 	for iters := 0; iters < 10; iters++ {
 		ms := 450 + (rand.Int63() % 100)
 		time.Sleep(time.Duration(ms) * time.Millisecond)
@@ -78,6 +79,8 @@ func (ts *Test) checkOneLeader() int {
 		lastTermWithLeader := -1
 		for term, leaders := range leaders {
 			if len(leaders) > 1 {
+				details := fmt.Sprintf("multiple leaders in term %v = %v", term, leaders)
+				tester.AnnotateCheckerFailure("multiple leaders", details)
 				ts.Fatalf("term %d has %d (>1) leaders", term, len(leaders))
 			}
 			if term > lastTermWithLeader {
@@ -86,14 +89,20 @@ func (ts *Test) checkOneLeader() int {
 		}
 
 		if len(leaders) != 0 {
+			details := fmt.Sprintf("leader in term %v = %v",
+				lastTermWithLeader, leaders[lastTermWithLeader][0])
+			tester.AnnotateCheckerSuccess(details, details)
 			return leaders[lastTermWithLeader][0]
 		}
 	}
+	details := fmt.Sprintf("unable to find a leader")
+	tester.AnnotateCheckerFailure("no leader", details)
 	ts.Fatalf("expected one leader, got none")
 	return -1
 }
 
 func (ts *Test) checkTerms() int {
+	tester.AnnotateCheckerBegin("checking term agreement")
 	term := -1
 	for i := 0; i < ts.n; i++ {
 		if ts.g.IsConnected(i) {
@@ -101,10 +110,15 @@ func (ts *Test) checkTerms() int {
 			if term == -1 {
 				term = xterm
 			} else if term != xterm {
+				details := fmt.Sprintf("node ids -> terms = { %v -> %v; %v -> %v }",
+					i - 1, term, i, xterm)
+				tester.AnnotateCheckerFailure("term disagreed", details)
 				ts.Fatalf("servers disagree on term")
 			}
 		}
 	}
+	details := fmt.Sprintf("term = %v", term)
+	tester.AnnotateCheckerSuccess("term agreed", details)
 	return term
 }
 
@@ -134,14 +148,32 @@ func (ts *Test) checkLogs(i int, m raftapi.ApplyMsg) (string, bool) {
 // check that none of the connected servers
 // thinks it is the leader.
 func (ts *Test) checkNoLeader() {
+	tester.AnnotateCheckerBegin("checking no unexpected leader among connected servers")
 	for i := 0; i < ts.n; i++ {
 		if ts.g.IsConnected(i) {
 			_, is_leader := ts.srvs[i].GetState()
 			if is_leader {
-				ts.Fatalf("expected no leader among connected servers, but %v claims to be leader", i)
+				details := fmt.Sprintf("leader = %v", i)
+				tester.AnnotateCheckerFailure("unexpected leader found", details)
+				ts.Fatalf(details)
 			}
 		}
 	}
+	tester.AnnotateCheckerSuccess("no unexpected leader", "no unexpected leader")
+}
+
+func (ts *Test) checkNoAgreement(index int) {
+	text := fmt.Sprintf("checking no unexpected agreement at index %v", index)
+	tester.AnnotateCheckerBegin(text)
+	n, _ := ts.nCommitted(index)
+	if n > 0 {
+		desp := fmt.Sprintf("unexpected agreement at index %v", index)
+		details := fmt.Sprintf("%v server(s) commit incorrectly index", n)
+		tester.AnnotateCheckerFailure(desp, details)
+		ts.Fatalf("%v committed but no majority", n)
+	}
+	desp := fmt.Sprintf("no unexpected agreement at index %v", index)
+	tester.AnnotateCheckerSuccess(desp, "OK")
 }
 
 // how many servers think a log entry is committed?
@@ -153,6 +185,7 @@ func (ts *Test) nCommitted(index int) (int, any) {
 	var cmd any = nil
 	for _, rs := range ts.srvs {
 		if rs.applyErr != "" {
+			tester.AnnotateCheckerFailure("apply error", rs.applyErr)
 			ts.t.Fatal(rs.applyErr)
 		}
 
@@ -160,8 +193,10 @@ func (ts *Test) nCommitted(index int) (int, any) {
 
 		if ok {
 			if count > 0 && cmd != cmd1 {
-				ts.Fatalf("committed values do not match: index %v, %v, %v",
+				text := fmt.Sprintf("committed values at index %v do not match (%v != %v)",
 					index, cmd, cmd1)
+				tester.AnnotateCheckerFailure("unmatched committed values", text)
+				ts.Fatalf(text)
 			}
 			count += 1
 			cmd = cmd1
@@ -183,6 +218,16 @@ func (ts *Test) nCommitted(index int) (int, any) {
 // if retry==false, calls Start() only once, in order
 // to simplify the early Lab 3B tests.
 func (ts *Test) one(cmd any, expectedServers int, retry bool) int {
+	var textretry string
+	if retry {
+		textretry = "with"
+	} else {
+		textretry = "without"
+	}
+	textcmd := fmt.Sprintf("%v", cmd)
+	textb := fmt.Sprintf("checking agreement of %.8s by at least %v servers %v retry",
+		textcmd, expectedServers, textretry)
+	tester.AnnotateCheckerBegin(textb)
 	t0 := time.Now()
 	starts := 0
 	for time.Since(t0).Seconds() < 10 && ts.checkFinished() == false {
@@ -214,12 +259,16 @@ func (ts *Test) one(cmd any, expectedServers int, retry bool) int {
 					// committed
 					if cmd1 == cmd {
 						// and it was the command we submitted.
+						desp := fmt.Sprintf("agreement of %.8s reached", textcmd)
+						tester.AnnotateCheckerSuccess(desp, "OK")
 						return index
 					}
 				}
 				time.Sleep(20 * time.Millisecond)
 			}
 			if retry == false {
+				desp := fmt.Sprintf("agreement of %.8s failed", textcmd)
+				tester.AnnotateCheckerFailure(desp, "failed after submitting command")
 				ts.Fatalf("one(%v) failed to reach agreement", cmd)
 			}
 		} else {
@@ -227,6 +276,8 @@ func (ts *Test) one(cmd any, expectedServers int, retry bool) int {
 		}
 	}
 	if ts.checkFinished() == false {
+		desp := fmt.Sprintf("agreement of %.8s failed", textcmd)
+		tester.AnnotateCheckerFailure(desp, "failed after 10-second timeout")
 		ts.Fatalf("one(%v) failed to reach agreement", cmd)
 	}
 	return -1
@@ -262,6 +313,10 @@ func (ts *Test) wait(index int, n int, startTerm int) any {
 	}
 	nd, cmd := ts.nCommitted(index)
 	if nd < n {
+		desp := fmt.Sprintf("less than %v servers commit index %v", n, index)
+		details := fmt.Sprintf(
+			"only %v (< %v) servers commit index %v at term %v", nd, n, index, startTerm)
+		tester.AnnotateCheckerFailure(desp, details)
 		ts.Fatalf("only %d decided for index %d; wanted %d",
 			nd, index, n)
 	}

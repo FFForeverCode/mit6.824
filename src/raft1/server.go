@@ -51,6 +51,7 @@ func newRfsrv(ts *Test, srv int, ends []*labrpc.ClientEnd, persister *tester.Per
 			// ideally Raft should send it up on applyCh...
 			err := s.ingestSnap(snapshot, -1)
 			if err != "" {
+				tester.AnnotateCheckerFailureBeforeExit("failed to ingest snapshot", err)
 				ts.t.Fatal(err)
 			}
 		}
@@ -106,6 +107,7 @@ func (rs *rfsrv) applier(applyCh chan raftapi.ApplyMsg) {
 				err_msg = fmt.Sprintf("server %v apply out of order %v", rs.me, m.CommandIndex)
 			}
 			if err_msg != "" {
+				tester.AnnotateCheckerFailureBeforeExit("apply error", err_msg)
 				log.Fatalf("apply error: %v", err_msg)
 				rs.applyErr = err_msg
 				// keep reading after error so that Raft doesn't block
@@ -149,12 +151,18 @@ func (rs *rfsrv) applierSnap(applyCh chan raftapi.ApplyMsg) {
 					xlog = append(xlog, rs.logs[j])
 				}
 				e.Encode(xlog)
+				start := tester.GetAnnotateTimestamp()
 				rs.raft.Snapshot(m.CommandIndex, w.Bytes())
+				details := fmt.Sprintf(
+					"snapshot created after applying the command at index %v",
+					m.CommandIndex)
+				tester.AnnotateInfoInterval(start, "snapshot created", details)
 			}
 		} else {
 			// Ignore other types of ApplyMsg.
 		}
 		if err_msg != "" {
+			tester.AnnotateCheckerFailureBeforeExit("apply error", err_msg)
 			log.Fatalf("apply error: %v", err_msg)
 			rs.applyErr = err_msg
 			// keep reading after error so that Raft doesn't block
@@ -169,6 +177,7 @@ func (rs *rfsrv) ingestSnap(snapshot []byte, index int) string {
 	defer rs.mu.Unlock()
 
 	if snapshot == nil {
+		tester.AnnotateCheckerFailureBeforeExit("failed to ingest snapshot", "nil snapshot")
 		log.Fatalf("nil snapshot")
 		return "nil snapshot"
 	}
@@ -178,6 +187,8 @@ func (rs *rfsrv) ingestSnap(snapshot []byte, index int) string {
 	var xlog []any
 	if d.Decode(&lastIncludedIndex) != nil ||
 		d.Decode(&xlog) != nil {
+		text := "failed to decode snapshot"
+		tester.AnnotateCheckerFailureBeforeExit(text, text)
 		log.Fatalf("snapshot decode error")
 		return "snapshot Decode() error"
 	}
