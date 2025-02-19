@@ -101,7 +101,7 @@ func AnnotateContinuousEnd(tag string) {
 
 // Used by users.
 
-func AnnotatePoint(tag, desp, details string) {
+func Annotate(tag, desp, details string) {
 	annotation.annotatePointColor(tag, desp, details, COLOR_USER)
 }
 
