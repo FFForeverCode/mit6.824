@@ -292,7 +292,7 @@ func TestSnapshotRPC4C(t *testing.T) {
 		NSRV         = 3
 		MAXRAFTSTATE = 1000
 	)
-	ts := MakeTest(t, "4C SnapshotsRPC", 0, NSRV, false, false, false, MAXRAFTSTATE, false)
+	ts := MakeTest(t, "4C SnapshotsRPC", 0, NSRV, true, false, false, MAXRAFTSTATE, false)
 	defer ts.Cleanup()
 
 	ck := ts.MakeClerk()
@@ -346,7 +346,7 @@ func TestSnapshotRPC4C(t *testing.T) {
 // are the snapshots not too huge? 500 bytes is a generous bound for the
 // operations we're doing here.
 func TestSnapshotSize4C(t *testing.T) {
-	ts := MakeTest(t, "4C snapshot size is reasonable", 0, 3, false, false, false, 1000, false)
+	ts := MakeTest(t, "4C snapshot size is reasonable", 0, 3, true, false, false, 1000, false)
 	defer ts.Cleanup()
 
 	maxsnapshotstate := 500

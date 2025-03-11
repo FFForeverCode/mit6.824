@@ -102,6 +102,10 @@ func (sg *ServerGrp) SrvNames() []string {
 	return sg.servernames
 }
 
+func (sg *ServerGrp) SrvName(i int) string {
+	return sg.servernames[i]
+}
+
 func (sg *ServerGrp) Services() [][]IService {
 	ss := make([][]IService, 0, len(sg.srvs))
 	for _, s := range sg.srvs {
@@ -244,6 +248,7 @@ func (sg *ServerGrp) StartServers() {
 
 // Shutdown a server by isolating it
 func (sg *ServerGrp) ShutdownServer(i int) {
+	//log.Printf("ShutdownServer %v", ServerName(sg.gid, i))
 	sg.disconnect(i, sg.all())
 
 	// disable client connections to the server.
@@ -287,6 +292,19 @@ func (sg *ServerGrp) MakePartition(l int) ([]int, []int) {
 	}
 	p2[len(p2)-1] = l
 	return p1, p2
+}
+
+func (sg *ServerGrp) AllowServersExcept(l int) []int {
+	n := len(sg.srvs) - 1
+	p := make([]int, n)
+	j := 0
+	for i, _ := range sg.srvs {
+		if i != l {
+			p[j] = i
+			j++
+		}
+	}
+	return p
 }
 
 func (sg *ServerGrp) Partition(p1 []int, p2 []int) {

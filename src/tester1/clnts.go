@@ -66,7 +66,7 @@ func (clnt *Clnt) makeEnd(server string) end {
 func (clnt *Clnt) Call(server, method string, args interface{}, reply interface{}) bool {
 	end := clnt.makeEnd(server)
 	ok := end.end.Call(method, args, reply)
-	//log.Printf("%p: Call e %v m %v %v %v ok %v", clnt, end.name, method, args, reply, ok)
+	// log.Printf("%p: Call done e %v m %v %v %v ok %v", clnt, end.name, method, args, reply, ok)
 	return ok
 }
 
@@ -75,10 +75,35 @@ func (clnt *Clnt) ConnectAll() {
 	defer clnt.mu.Unlock()
 
 	for _, e := range clnt.ends {
-		// log.Printf("%p: ConnectAll: enable %v", clnt, e.name)
+		//log.Printf("%p: ConnectAll: enable %v", clnt, e.name)
 		clnt.net.Enable(e.name, true)
 	}
 	clnt.srvs = nil
+}
+
+func (clnt *Clnt) ConnectTo(srvs []string) {
+	clnt.mu.Lock()
+	defer clnt.mu.Unlock()
+
+	// log.Printf("%p: ConnectTo: enable %v", clnt, srvs)
+	clnt.srvs = srvs
+	for srv, e := range clnt.ends {
+		if clnt.allowedL(srv) {
+			clnt.net.Enable(e.name, true)
+		}
+	}
+}
+
+func (clnt *Clnt) Disconnect(srv string) {
+	clnt.mu.Lock()
+	defer clnt.mu.Unlock()
+
+	for s, e := range clnt.ends {
+		if s == srv {
+			//log.Printf("%p: Disconnect: disable %v %s", clnt, srv)
+			clnt.net.Enable(e.name, false)
+		}
+	}
 }
 
 func (clnt *Clnt) DisconnectAll() {

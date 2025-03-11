@@ -275,17 +275,21 @@ func MakeKeys(n int) []string {
 	return keys
 }
 
-func (ts *Test) SpreadPuts(ck IKVClerk, n int) ([]string, []string) {
+func (ts *Test) SpreadPutsSize(ck IKVClerk, n, valsz int) ([]string, []string) {
 	ka := MakeKeys(n)
 	va := make([]string, n)
 	for i := 0; i < n; i++ {
-		va[i] = tester.Randstring(20)
+		va[i] = tester.Randstring(valsz)
 		ck.Put(ka[i], va[i], rpc.Tversion(0))
 	}
 	for i := 0; i < n; i++ {
 		ts.CheckGet(ck, ka[i], va[i], rpc.Tversion(1))
 	}
 	return ka, va
+}
+
+func (ts *Test) SpreadPuts(ck IKVClerk, n int) ([]string, []string) {
+	return ts.SpreadPutsSize(ck, n, 20)
 }
 
 type entry struct {

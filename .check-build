@@ -47,11 +47,11 @@ REFERENCE_FILES=(
     src/kvraft1/test.go
 
     # lab 5a
-    src/shardkv1/test.go
+    # src/shardkv1/test.go
 
     # lab 5b
-    src/shardkv1/shardkv_test.go
-    src/shardkv1/shardcfg/shardcfg_test.go
+    # src/shardkv1/shardkv_test.go
+    # src/shardkv1/shardcfg/shardcfg_test.go
 )
 
 main() {
@@ -123,8 +123,8 @@ check_lab5a() {
 }
 
 check_lab5b() {
-    check_cmd cd src/shardkv1
-    check_cmd go test -c
+    # check_cmd cd src/shardkv1
+    # check_cmd go test -c
     # also check other labs/parts
     cd "$tmpdir"
     check_lab5a

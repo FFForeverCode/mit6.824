@@ -20,10 +20,9 @@ type Raft interface {
 }
 
 // As each Raft peer becomes aware that successive log entries are
-// committed, the peer should send an ApplyMsg to the service (or
-// tester) on the same server, via the applyCh passed to Make(). set
-// CommandValid to true to indicate that the ApplyMsg contains a newly
-// committed log entry.
+// committed, the peer should send an ApplyMsg to the server (or
+// tester), via the applyCh passed to Make(). Set CommandValid to true
+// to indicate that the ApplyMsg contains a newly committed log entry.
 //
 // In Lab 3 you'll want to send other kinds of messages (e.g.,
 // snapshots) on the applyCh; at that point you can add fields to
