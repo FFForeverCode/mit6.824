@@ -2,6 +2,7 @@ package rsm
 
 import (
 	//"log"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 
 type Test struct {
 	*tester.Config
+	mu           sync.Mutex
 	t            *testing.T
 	g            *tester.ServerGrp
 	maxraftstate int
@@ -62,7 +64,7 @@ func inPartition(s int, p []int) bool {
 	return false
 }
 
-func (ts *Test) oneIncPartition(p []int) *Rep {
+func (ts *Test) onePartition(p []int, req any) any {
 	// try all the servers, maybe one is the leader but give up after NSEC
 	t0 := time.Now()
 	for time.Since(t0).Seconds() < NSEC {
@@ -71,11 +73,13 @@ func (ts *Test) oneIncPartition(p []int) *Rep {
 			if ts.g.IsConnected(index) {
 				s := ts.srvs[index]
 				if s.rsm != nil && inPartition(index, p) {
-					err, rep := s.rsm.Submit(Inc{})
+					err, rep := s.rsm.Submit(req)
 					if err == rpc.OK {
+						ts.mu.Lock()
 						ts.leader = index
+						ts.mu.Unlock()
 						//log.Printf("leader = %d", ts.leader)
-						return rep.(*Rep)
+						return rep
 					}
 				}
 			}
@@ -84,12 +88,23 @@ func (ts *Test) oneIncPartition(p []int) *Rep {
 		time.Sleep(50 * time.Millisecond)
 		//log.Printf("try again: no leader")
 	}
-	ts.Fatalf("one: took too long")
 	return nil
 }
 
-func (ts *Test) oneInc() *Rep {
-	return ts.oneIncPartition(nil)
+func (ts *Test) oneInc() *IncRep {
+	rep := ts.onePartition(nil, Inc{})
+	if rep == nil {
+		return nil
+	}
+	return rep.(*IncRep)
+}
+
+func (ts *Test) oneNull() *NullRep {
+	rep := ts.onePartition(nil, Null{})
+	if rep == nil {
+		return nil
+	}
+	return rep.(*NullRep)
 }
 
 func (ts *Test) checkCounter(v int, nsrv int) {

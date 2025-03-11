@@ -83,7 +83,7 @@ func (s *Server) shutdownServer() {
 	// inform all services to stop
 	for _, svc := range s.svcs {
 		if svc != nil {
-			svc.Kill()
+			go svc.Kill()
 		}
 	}
 	s.svcs = nil

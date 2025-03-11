@@ -105,7 +105,7 @@ func TestLeaderPartition4A(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// submit an Inc in the majority
-	rep := ts.oneIncPartition(p1)
+	rep := ts.onePartition(p1, Inc{})
 
 	select {
 	case err := <-done:
@@ -123,7 +123,154 @@ func TestLeaderPartition4A(t *testing.T) {
 	}
 
 	// check that all replicas have the same value for counter
-	ts.checkCounter(rep.N, NSRV)
+	ts.checkCounter(rep.(*IncRep).N, NSRV)
+}
+
+// test that restart replays Incs
+func TestRestartReplay4A(t *testing.T) {
+	const (
+		NINC    = 100
+		NSUBMIT = 100
+	)
+
+	ts := makeTest(t, -1)
+	defer ts.cleanup()
+
+	ts.Begin("Test Restart")
+
+	for i := 0; i < NINC; i++ {
+		r := ts.oneInc()
+		if r.N != i+1 {
+			ts.t.Fatalf("expected %d instead of %d", i, r.N)
+		}
+		ts.checkCounter(r.N, NSRV)
+	}
+
+	ts.Group(Gid).Shutdown()
+
+	time.Sleep(1 * time.Second)
+
+	ts.Group(Gid).StartServers()
+
+	// submit an Inc
+	r := ts.oneInc()
+
+	if r.N != NINC+1 {
+		t.Fatalf("Expected %d got %d", NINC+1, r.N)
+	}
+
+	time.Sleep(1 * time.Second)
+
+	ts.checkCounter(r.N, NSRV)
+}
+
+// Test if Submit() terminates after tester's Shutdown() has called
+// raft's Kill().  Kill() should cause your raft to close the applyCh
+// passed to it in Make(), which in turns allows rsm to know that it
+// is done.
+func TestShutdown4A(t *testing.T) {
+	const (
+		NSUBMIT = 100
+	)
+
+	ts := makeTest(t, -1)
+	defer ts.cleanup()
+
+	ts.Begin("Test Shutdown")
+
+	// Submit many Null's concurrently
+	done := make(chan struct{})
+	go func() {
+		var wg sync.WaitGroup
+		for i := 0; i < NSUBMIT; i++ {
+			wg.Add(1)
+			go func(i int) {
+				defer wg.Done()
+				ts.oneNull()
+			}(i)
+		}
+		wg.Wait()
+		done <- struct{}{}
+	}()
+
+	// give some time to submit
+	time.Sleep(20 * time.Millisecond)
+
+	ts.Group(Gid).Shutdown()
+
+	select {
+	case <-done:
+	case <-time.After((NSEC + 1) * time.Second):
+		ts.Fatalf("Submit didn't stop after shutdown")
+	}
+}
+
+// Test if commands after restart don't get confused with ones
+// submitted before Shutdown()
+func TestRestartSubmit4A(t *testing.T) {
+	const (
+		NINC    = 100
+		NSUBMIT = 100
+	)
+
+	ts := makeTest(t, -1)
+	defer ts.cleanup()
+
+	ts.Begin("Test Restart and submit")
+
+	for i := 0; i < NINC; i++ {
+		r := ts.oneInc()
+		if r.N != i+1 {
+			ts.t.Fatalf("expected %d instead of %d", i, r.N)
+		}
+		ts.checkCounter(r.N, NSRV)
+	}
+
+	ts.Group(Gid).Shutdown()
+
+	time.Sleep(1 * time.Second)
+
+	ts.Group(Gid).StartServers()
+
+	// submit an Inc
+	r := ts.oneInc()
+
+	if r.N != NINC+1 {
+		t.Fatalf("Expected %d got %d", NINC+1, r.N)
+	}
+
+	time.Sleep(1 * time.Second)
+
+	// Submit many Null's concurrently
+	done := make(chan struct{})
+	go func() {
+		var wg sync.WaitGroup
+		for i := 0; i < NSUBMIT; i++ {
+			wg.Add(1)
+			go func(i int) {
+				defer wg.Done()
+				ts.oneNull()
+			}(i)
+		}
+		wg.Wait()
+		done <- struct{}{}
+	}()
+
+	// give some time to submit
+	time.Sleep(20 * time.Millisecond)
+
+	ts.Group(Gid).Shutdown()
+
+	select {
+	case <-done:
+	case <-time.After((NSEC + 1) * time.Second):
+		ts.Fatalf("Submit didn't stop after shutdown")
+	}
+
+	ts.Group(Gid).StartServers()
+
+	r = ts.oneInc()
+	ts.checkCounter(r.N, NSRV)
 }
 
 // test snapshot and restore

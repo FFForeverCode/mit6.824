@@ -78,7 +78,7 @@ main() {
         "lab1") check_lab1;;
         "lab2") check_lab2;;
         "lab3a"|"lab3b"|"lab3c"|"lab3d") check_lab3;;
-        "lab4a"|"lab4b") check_lab4;;
+        "lab4a"|"lab4b"|"lab4c") check_lab4;;
         "lab5a") check_lab5a;;
         "lab5b") check_lab5b;;
         *) die "unknown lab: $labnum";;

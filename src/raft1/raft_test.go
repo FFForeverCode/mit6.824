@@ -675,7 +675,7 @@ loop:
 				desp := fmt.Sprintf("leader %v adds the command at the wrong index", leader)
 				details := fmt.Sprintf(
 					"the command should locate at index %v, but the leader puts it at %v",
-					starti + i, index1)
+					starti+i, index1)
 				tester.AnnotateCheckerFailure(desp, details)
 				t.Fatalf("Start() failed")
 			}
@@ -688,13 +688,13 @@ loop:
 					// term changed -- try again
 					details := fmt.Sprintf(
 						"term changed while waiting for %v servers to commit index %v",
-						servers, starti + i)
+						servers, starti+i)
 					tester.AnnotateCheckerNeutral(despretry, details)
 					continue loop
 				}
 				details := fmt.Sprintf(
 					"the command submitted at index %v in term %v is %v, but read %v",
-					starti + i, term, cmds[i - 1], cmd)
+					starti+i, term, cmds[i-1], cmd)
 				tester.AnnotateCheckerFailure("incorrect command committed", details)
 				t.Fatalf("wrong value %v committed for index %v; expected %v\n", cmd, starti+i, cmds)
 			}
@@ -750,12 +750,12 @@ loop:
 
 	if total3-total2 > 3*20 {
 		details := fmt.Sprintf("number of RPC used for 1 second of idleness = %v > %v",
-			total3-total2, 3 * 20)
+			total3-total2, 3*20)
 		tester.AnnotateCheckerFailure("used too many RPCs in idle", details)
 		t.Fatalf("too many RPCs (%v) for 1 second of idleness\n", total3-total2)
 	}
 	details := fmt.Sprintf("number of RPC used for 1 second of idleness = %v <= %v",
-		total3-total2, 3 * 20)
+		total3-total2, 3*20)
 	tester.AnnotateCheckerSuccess(
 		"used a reasonable number of RPCs in idle", details)
 }
@@ -913,9 +913,10 @@ func TestFigure83C(t *testing.T) {
 	for iters := 0; iters < 1000; iters++ {
 		leader := -1
 		for i := 0; i < servers; i++ {
-			if ts.srvs[i].Raft() != nil {
+			rf := ts.srvs[i].Raft()
+			if rf != nil {
 				cmd := rand.Int()
-				_, _, ok := ts.srvs[i].Raft().Start(cmd)
+				_, _, ok := rf.Start(cmd)
 				if ok {
 					text := fmt.Sprintf("submitted command %v to server %v", cmd, i)
 					tester.AnnotateInfo(text, text)

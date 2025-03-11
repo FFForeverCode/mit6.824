@@ -80,8 +80,8 @@ func (rsm *RSM) Raft() raftapi.Raft {
 func (rsm *RSM) Submit(req any) (rpc.Err, any) {
 
 	// Submit creates an Op structure to run a command through Raft;
-	// for example: op := Op{Id: rsm.nextId, Req: req}, where req is
-	// the argument to Submit and rsm.nextId a unique id for the op.
+	// for example: op := Op{Me: rsm.me, Id: id, Req: req}, where req
+	// is the argument to Submit and id is a unique id for the op.
 
 	// your code here
 	return rpc.ErrWrongLeader, nil // i'm dead, try another server.

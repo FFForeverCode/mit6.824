@@ -202,6 +202,13 @@ func (rn *Network) LongDelays(yes bool) {
 	rn.longDelays = yes
 }
 
+func (rn *Network) IsLongDelays() bool {
+	rn.mu.Lock()
+	defer rn.mu.Unlock()
+
+	return rn.longDelays
+}
+
 func (rn *Network) readEndnameInfo(endname interface{}) (enabled bool,
 	servername interface{}, server *Server, reliable bool, longreordering bool,
 ) {
@@ -305,7 +312,7 @@ func (rn *Network) processReq(req reqMsg) {
 	} else {
 		// simulate no reply and eventual timeout.
 		ms := 0
-		if rn.longDelays {
+		if rn.IsLongDelays() {
 			// let Raft tests check that leader doesn't send
 			// RPCs synchronously.
 			ms = (rand.Int() % LONGDELAY)

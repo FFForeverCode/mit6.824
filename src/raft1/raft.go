@@ -174,15 +174,16 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	return index, term, isLeader
 }
 
-// the tester doesn't halt goroutines created by Raft after each test,
-// but it does call the Kill() method. your code can use killed() to
-// check whether Kill() has been called. the use of atomic avoids the
-// need for a lock.
+// The tester calls Kill() when it is done with a Raft instance (e.g.,
+// when it simulates a crash and restarts the peer or when the test is
+// done).  Kill allows your implementation (1) to close the applyCh so
+// that the application on top of Raft can clean up, and (2) to return
+// out of long-running goroutines.
 //
-// the issue is that long-running goroutines use memory and may chew
-// up CPU time, perhaps causing later tests to fail and generating
-// confusing debug output. any goroutine with a long-running loop
-// should call killed() to check whether it should stop.
+// Long-running goroutines use memory and may chew up CPU time,
+// perhaps causing later tests to fail and generating confusing debug
+// output. any goroutine with a long-running loop should call killed()
+// to check whether it should stop.
 func (rf *Raft) Kill() {
 	atomic.StoreInt32(&rf.dead, 1)
 	// Your code here, if desired.
