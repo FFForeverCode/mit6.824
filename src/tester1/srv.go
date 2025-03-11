@@ -1,7 +1,7 @@
 package tester
 
 import (
-	// "log"
+	//"log"
 	"sync"
 
 	"6.5840/labrpc"
@@ -46,12 +46,16 @@ func (s *Server) startServer(gid Tgid) *Server {
 	return srv
 }
 
-func (s *Server) connect(to []int) {
+// connect s to servers listed in to
+func (s *Server) connect(sg *ServerGrp, to []int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for j := 0; j < len(to); j++ {
-		endname := s.endNames[to[j]]
-		s.net.Enable(endname, true)
+		if sg.IsConnected(to[j]) {
+			//log.Printf("connect %d to %d (%v)", s.id, to[j], s.endNames[to[j]])
+			endname := s.endNames[to[j]]
+			s.net.Enable(endname, true)
+		}
 	}
 }
 

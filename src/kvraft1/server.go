@@ -19,6 +19,11 @@ type KVServer struct {
 	// Your definitions here.
 }
 
+// To type-cast req to the right type, take a look at Go's type switches or type
+// assertions below:
+//
+// https://go.dev/tour/methods/16
+// https://go.dev/tour/methods/15
 func (kv *KVServer) DoOp(req any) any {
 	// Your code here
 	return nil

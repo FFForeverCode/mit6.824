@@ -150,19 +150,19 @@ func (sg *ServerGrp) cleanup() {
 	}
 }
 
-// attach server i to servers listed in to
-// caller must hold cfg.mu
+// attach server i to servers listed in to caller must hold cfg.mu.
 func (sg *ServerGrp) connect(i int, to []int) {
 	//log.Printf("connect peer %d to %v\n", i, to)
 
 	sg.connected[i] = true
 
-	// outgoing socket files
-	sg.srvs[i].connect(to)
+	// connect outgoing end points
+	sg.srvs[i].connect(sg, to)
 
-	// incoming socket files
+	// connect incoming end points to me
 	for j := 0; j < len(to); j++ {
-		if sg.IsConnected(j) {
+		if sg.IsConnected(to[j]) {
+			//log.Printf("connect %d (%v) to %d", to[j], sg.srvs[to[j]].endNames[i], i)
 			endname := sg.srvs[to[j]].endNames[i]
 			sg.net.Enable(endname, true)
 		}
