@@ -46,12 +46,10 @@ REFERENCE_FILES=(
     src/kvraft1/kvraft_test.go
     src/kvraft1/test.go
 
-    # lab 5a
-    # src/shardkv1/test.go
-
-    # lab 5b
-    # src/shardkv1/shardkv_test.go
-    # src/shardkv1/shardcfg/shardcfg_test.go
+    # lab 5
+    src/shardkv1/test.go
+    src/shardkv1/shardkv_test.go
+    src/shardkv1/shardcfg/shardcfg_test.go
 )
 
 main() {
@@ -79,8 +77,7 @@ main() {
         "lab2") check_lab2;;
         "lab3a"|"lab3b"|"lab3c"|"lab3d") check_lab3;;
         "lab4a"|"lab4b"|"lab4c") check_lab4;;
-        "lab5a") check_lab5a;;
-        "lab5b") check_lab5b;;
+        "lab5a"|"lab5b"|"lab5c") check_lab5;;
         *) die "unknown lab: $labnum";;
     esac
 
@@ -117,17 +114,10 @@ check_lab4() {
     check_cmd go test -c
 }
 
-check_lab5a() {
-    # check_cmd cd src/shardctrler1
-    # check_cmd go test -c
-}
-
-check_lab5b() {
-    # check_cmd cd src/shardkv1
-    # check_cmd go test -c
+check_lab5() {
+    check_cmd cd src/shardkv1
+    check_cmd go test -c
     # also check other labs/parts
-    cd "$tmpdir"
-    check_lab5a
     cd "$tmpdir"
     check_lab4
     cd "$tmpdir"
