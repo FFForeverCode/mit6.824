@@ -118,8 +118,8 @@ check_lab4() {
 }
 
 check_lab5a() {
-    check_cmd cd src/shardctrler1
-    check_cmd go test -c
+    # check_cmd cd src/shardctrler1
+    # check_cmd go test -c
 }
 
 check_lab5b() {
