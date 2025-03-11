@@ -87,6 +87,6 @@ func (ts *Test) makeTitle() string {
 	} else {
 		title = title + "one client"
 	}
-	title = title + " (" + ts.part + ")" // 4A or 4B
+	title = title + " (" + ts.part + ")" // 4A, 4B, 4C
 	return title
 }
