@@ -68,7 +68,9 @@ func (ts *Test) onePartition(p []int, req any) any {
 	// try all the servers, maybe one is the leader but give up after NSEC
 	t0 := time.Now()
 	for time.Since(t0).Seconds() < NSEC {
+		ts.mu.Lock()
 		index := ts.leader
+		ts.mu.Unlock()
 		for range ts.srvs {
 			if ts.g.IsConnected(index) {
 				s := ts.srvs[index]

@@ -878,10 +878,11 @@ func TestPersist33C(t *testing.T) {
 	ts.g.ShutdownServer((leader + 0) % servers)
 	ts.g.ShutdownServer((leader + 1) % servers)
 	tester.AnnotateShutdown([]int{(leader + 0) % servers, (leader + 1) % servers})
-	ts.restart((leader + 2) % servers)
-	ts.restart((leader + 0) % servers)
-	tester.AnnotateRestart([]int{(leader + 2) % servers, (leader + 0) % servers})
+	ts.g.ConnectOne((leader + 2) % servers)
 	tester.AnnotateConnection(ts.g.GetConnected())
+	ts.restart((leader + 0) % servers)
+	tester.AnnotateRestart([]int{(leader + 0) % servers})
+
 
 	ts.one(103, 2, true)
 

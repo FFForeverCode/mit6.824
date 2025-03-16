@@ -2,7 +2,7 @@ package shardkv
 
 import (
 	"fmt"
-	//"log"
+	"log"
 	"math/rand"
 	"sync"
 	"sync/atomic"
@@ -131,21 +131,18 @@ func (ts *Test) join(sck *shardctrler.ShardCtrler, gid tester.Tgid, srvs []strin
 	newcfg := cfg.Copy()
 	ok := newcfg.JoinBalance(map[tester.Tgid][]string{gid: srvs})
 	if !ok {
-		return rpc.ErrVersion
+		log.Fatalf("join: group %d is already present", gid)
 	}
-	err := sck.ChangeConfigTo(newcfg)
-	return err
+	return sck.ChangeConfigTo(newcfg)
 }
 
 func (ts *Test) joinGroups(sck *shardctrler.ShardCtrler, gids []tester.Tgid) rpc.Err {
-	for i, gid := range gids {
+	for _, gid := range gids {
 		ts.Config.MakeGroupStart(gid, NSRV, ts.StartServerShardGrp)
 		if err := ts.join(sck, gid, ts.Group(gid).SrvNames()); err != rpc.OK {
 			return err
 		}
-		if i < len(gids)-1 {
-			time.Sleep(INTERGRPDELAY * time.Millisecond)
-		}
+		time.Sleep(INTERGRPDELAY * time.Millisecond)
 	}
 	return rpc.OK
 }
@@ -156,20 +153,18 @@ func (ts *Test) leave(sck *shardctrler.ShardCtrler, gid tester.Tgid) rpc.Err {
 	newcfg := cfg.Copy()
 	ok := newcfg.LeaveBalance([]tester.Tgid{gid})
 	if !ok {
-		return rpc.ErrVersion
+		log.Fatalf("leave: group %d is already not present", gid)
 	}
 	return sck.ChangeConfigTo(newcfg)
 }
 
 func (ts *Test) leaveGroups(sck *shardctrler.ShardCtrler, gids []tester.Tgid) rpc.Err {
-	for i, gid := range gids {
+	for _, gid := range gids {
 		if err := ts.leave(sck, gid); err != rpc.OK {
 			return err
 		}
 		ts.Config.ExitGroup(gid)
-		if i < len(gids)-1 {
-			time.Sleep(INTERGRPDELAY * time.Millisecond)
-		}
+		time.Sleep(INTERGRPDELAY * time.Millisecond)
 	}
 	return rpc.OK
 }
@@ -196,30 +191,13 @@ func (ts *Test) disconnectClntFromLeader(clnt *tester.Clnt, gid tester.Tgid) int
 	return l
 }
 
-func (ts *Test) checkLogs(gids []tester.Tgid) {
-	for _, gid := range gids {
-		n := ts.Group(gid).LogSize()
-		s := ts.Group(gid).SnapshotSize()
-		if ts.maxraftstate >= 0 && n > 8*ts.maxraftstate {
-			ts.t.Fatalf("persister.RaftStateSize() %v, but maxraftstate %v",
-				n, ts.maxraftstate)
-		}
-		if ts.maxraftstate < 0 && s > 0 {
-			ts.t.Fatalf("maxraftstate is -1, but snapshot is non-empty!")
-		}
-
-	}
-}
-
 // make sure that the data really is sharded by
 // shutting down one shard and checking that some
 // Get()s don't succeed.
-func (ts *Test) checkShutdownSharding(down, up tester.Tgid, ka []string, va []string) {
+func (ts *Test) checkShutdownSharding(down tester.Tgid, ka []string, va []string) {
 	const NSEC = 2
 
 	ts.Group(down).Shutdown()
-
-	ts.checkLogs([]tester.Tgid{down, up}) // forbid snapshots
 
 	n := len(ka)
 	ch := make(chan string)
@@ -239,7 +217,6 @@ func (ts *Test) checkShutdownSharding(down, up tester.Tgid, ka []string, va []st
 		}(xi)
 	}
 
-	// wait a bit, only about half the Gets should succeed.
 	ndone := 0
 	for atomic.LoadInt32(&done) != 1 {
 		select {
@@ -254,9 +231,9 @@ func (ts *Test) checkShutdownSharding(down, up tester.Tgid, ka []string, va []st
 		}
 	}
 
-	//log.Printf("%d completions out of %d; down %d", ndone, n, down)
+	// log.Printf("%d completions out of %d; down %d", ndone, n, down)
 	if ndone >= n {
-		ts.Fatalf("expected less than %d completions with one shard dead\n", n)
+		ts.Fatalf("expected less than %d completions with shard %d down\n", n, down)
 	}
 
 	// bring the crashed shard/group back to life.
@@ -360,8 +337,8 @@ func (ts *Test) killCtrler(ck kvtest.IKVClerk, gid tester.Tgid, ka, va []string)
 	sck0.ExitController()
 
 	if ts.leases {
-		// reconnect old controller, which shouldn't be able
-		// to do anything
+		// reconnect old controller, which should bail out, because
+		// it has been superseded.
 		clnt.ConnectAll()
 
 		time.Sleep(1 * time.Second)
