@@ -83,9 +83,7 @@ func Put(cfg *tester.Config, ck IKVClerk, key string, value string, version rpc.
 
 // Checks that the log of Clerk.Put's and Clerk.Get's is linearizable (see
 // linearizability-faq.txt)
-func checkPorcupine(
-	t *testing.T, opLog *OpLog, annotations []porcupine.Annotation, nsec time.Duration,
-) {
+func checkPorcupine(t *testing.T, opLog *OpLog, nsec time.Duration) {
 	enabled := os.Getenv("VIS_ENABLE")
 	fpath := os.Getenv("VIS_FILE")
 	res, info := porcupine.CheckOperationsVerbose(models.KvModel, opLog.Read(), nsec)
@@ -102,6 +100,7 @@ func checkPorcupine(
 			fmt.Printf("info: failed to open visualization file %s (%v)\n", fpath, err)
 		} else if enabled != "never" {
 			// Don't produce visualization file if VIS_ENABLE is set to "never".
+			annotations := tester.FinalizeAnnotations("test failed")
 			info.AddAnnotations(annotations)
 			err = porcupine.Visualize(models.KvModel, info, file)
 			if err != nil {
@@ -116,7 +115,7 @@ func checkPorcupine(
 	}
 
 	// The result is either legal or unknown.
-	if enabled == "always" {
+	if enabled == "always" && tester.GetAnnotationFinalized() {
 		var file *os.File
 		var err error
 		if fpath == "" {
@@ -129,6 +128,7 @@ func checkPorcupine(
 			fmt.Printf("info: failed to open visualization file %s (%v)\n", fpath, err)
 			return
 		}
+		annotations := tester.FinalizeAnnotations("test passed")
 		info.AddAnnotations(annotations)
 		err = porcupine.Visualize(models.KvModel, info, file)
 		if err != nil {
@@ -180,9 +180,8 @@ func (ts *Test) CheckPorcupine() {
 }
 
 func (ts *Test) CheckPorcupineT(nsec time.Duration) {
-	// ts.RetrieveAnnotations() also clears the accumulated annotations so that
-	// the vis file containing client operations (generated here) won't be
+	// tester.RetrieveAnnotations() also clears the accumulated annotations so
+	// that the vis file containing client operations (generated here) won't be
 	// overridden by that without client operations (generated at cleanup time).
-	annotations := ts.RetrieveAnnotations()
-	checkPorcupine(ts.t, ts.oplog, annotations, nsec)
+	checkPorcupine(ts.t, ts.oplog, nsec)
 }

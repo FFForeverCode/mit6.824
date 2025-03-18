@@ -20,6 +20,7 @@ type Annotation struct {
 	mu          *sync.Mutex
 	annotations []porcupine.Annotation
 	continuous  map[string]Continuous
+	finalized   bool
 }
 
 type Continuous struct {
@@ -70,8 +71,22 @@ const (
 	TAG_INFO      string = "$ Test Info"
 )
 
-func (cfg *Config) RetrieveAnnotations() []porcupine.Annotation{
-	annotations := annotation.retrieve()
+func FinalizeAnnotations(end string) []porcupine.Annotation {
+	annotations := annotation.finalize()
+
+	// XXX: Make the last annotation an interval one to work around Porcupine's
+	// issue. Consider removing this once the issue is fixed.
+	t := timestamp()
+	aend := porcupine.Annotation{
+		Tag: TAG_INFO,
+		Start: t,
+		End: t + 1000,
+		Description: end,
+		Details: end,
+		BackgroundColor: COLOR_INFO,
+	}
+	annotations = append(annotations, aend)
+
 	return annotations
 }
 
@@ -173,11 +188,38 @@ func AnnotateCheckerNeutral(desp, details string) {
 	AnnotateCheckerEnd(desp, details, COLOR_NEUTRAL)
 }
 
+func SetAnnotationFinalized() {
+	annotation.mu.Lock()
+	defer annotation.mu.Unlock()
+
+	annotation.finalized = true
+}
+
+func (an *Annotation) isFinalized() bool {
+	annotation.mu.Lock()
+	defer annotation.mu.Unlock()
+
+	return annotation.finalized
+}
+
+func GetAnnotationFinalized() bool {
+	return annotation.isFinalized()
+}
+
 // Used before log.Fatalf
 func AnnotateCheckerFailureBeforeExit(desp, details string) {
 	AnnotateCheckerFailure(desp, details)
 	annotation.cleanup(true, "test failed")
 }
+
+// The current annotation API for failures is very hacky. We really should have
+// just one function that reads the current network/server status. For network,
+// we should be able to read whether an endname is enabled. However, if the
+// endname is enabled from X to Y, but not Y to X, the annotation would be
+// downright confusing. A better design (in the tester framework, not in the
+// annotation layer) is to have a single boolean for each pair of servers; once
+// we have such state, the annotation can then simply read the booleans to
+// determine the network partitions.
 
 // Two functions to annotate partitions: AnnotateConnection and
 // AnnotateTwoPartitions. The connected field of ServerGrp (in group.go) is
@@ -236,12 +278,29 @@ func annotateFault() {
 	AnnotateContinuousColor(TAG_PARTITION, text, text, COLOR_FAULT)
 }
 
+// Currently this API does not work with failed servers, nor with the connected
+// fields of ServerGrp (in group.go). It is used specifically for
+// ServerGrp.Partition.
 func AnnotateTwoPartitions(p1 []int, p2 []int) {
 	// A bit hard to check whether the partition actually changes, so just
 	// annotate on every invocation.
-	// TODO
-	text := fmt.Sprintf("%v %v", p1, p2)
+	text := fmt.Sprintf("partition = %v %v", p1, p2)
 	AnnotateContinuousColor(TAG_PARTITION, text, text, COLOR_FAULT)
+}
+
+func AnnotateClearFailure() {
+	finfo.mu.Lock()
+	defer finfo.mu.Unlock()
+
+	for id := range(finfo.crashed) {
+		finfo.crashed[id] = false
+	}
+
+	for id := range(finfo.connected) {
+		finfo.connected[id] = true
+	}
+
+	AnnotateContinuousEnd(TAG_PARTITION)
 }
 
 func AnnotateShutdown(servers []int) {
@@ -316,9 +375,12 @@ func timestamp() int64 {
 	return int64(time.Since(time.Unix(0, 0)))
 }
 
-func (an *Annotation) retrieve() []porcupine.Annotation {
+func (an *Annotation) finalize() []porcupine.Annotation {
 	an.mu.Lock()
+	defer an.mu.Unlock()
+
 	x := an.annotations
+
 	t := timestamp()
 	for tag, cont := range(an.continuous) {
 		a := porcupine.Annotation{
@@ -331,9 +393,8 @@ func (an *Annotation) retrieve() []porcupine.Annotation {
 		}
 		x = append(x, a)
 	}
-	an.annotations = make([]porcupine.Annotation, 0)
-	an.continuous = make(map[string]Continuous)
-	an.mu.Unlock()
+
+	an.finalized = true
 	return x
 }
 
@@ -341,6 +402,7 @@ func (an *Annotation) clear() {
 	an.mu.Lock()
 	an.annotations = make([]porcupine.Annotation, 0)
 	an.continuous = make(map[string]Continuous)
+	an.finalized = false
 	an.mu.Unlock()
 }
 
@@ -445,21 +507,22 @@ func (an *Annotation) annotateContinuousEnd(tag string) {
 
 func (an *Annotation) cleanup(failed bool, end string) {
 	enabled := os.Getenv("VIS_ENABLE")
-	if enabled == "never" || (!failed && enabled != "always") {
+	if enabled == "never" || (!failed && enabled != "always") || an.isFinalized() {
 		// Simply clean up the annotations without producing the vis file if
-		// VIS_ENABLE is set to "never", or if the test passes and VIS_ENABLE is
-		// not set to "always".
+		// VIS_ENABLE is set to "never", OR if the test passes AND VIS_ENABLE is
+		// not set to "always", OR the current test has already been finalized
+		// (because CheckPorcupine has already produced a vis file).
 		an.clear()
 		return
 	}
 
-	annotations := an.retrieve()
+	annotations := an.finalize()
 	if len(annotations) == 0 {
 		// Skip empty annotations.
 		return
 	}
 
-	// XXX: Make the last annotation a interval one to work around Porcupine's
+	// XXX: Make the last annotation an interval one to work around Porcupine's
 	// issue. Consider removing this once the issue is fixed.
 	t := timestamp()
 	aend := porcupine.Annotation{
@@ -499,6 +562,7 @@ func mkAnnotation() *Annotation {
 		mu: new(sync.Mutex),
 		annotations: make([]porcupine.Annotation, 0),
 		continuous: make(map[string]Continuous),
+		finalized: false,
 	}
 
 	return &an

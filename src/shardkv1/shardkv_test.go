@@ -22,8 +22,8 @@ const (
 // kvsrv1 lab.
 func TestInitQuery5A(t *testing.T) {
 
-	// MakeTest starts a key/value server using `kvsrv.StartKVServer`,
-	// which is defined in shardkv1/kvsrv1.
+	// MakeTest starts your lab2 key/value server using
+	// `kvsrv.StartKVServer`.
 	ts := MakeTest(t, "Test (5A): Init and Query ...", true)
 	defer ts.Cleanup()
 

@@ -3,6 +3,7 @@ package kvtest
 import (
 	"encoding/json"
 	//"log"
+	"fmt"
 	"math/rand"
 	"strconv"
 	"testing"
@@ -78,9 +79,11 @@ func (ts *Test) MakeClerk() IKVClerk {
 
 // Assumes different ck's put to different keys
 func (ts *Test) PutAtLeastOnce(ck IKVClerk, key, value string, ver rpc.Tversion, me int) rpc.Tversion {
+	verPrev := ver
 	for true {
 		err := ts.Put(ck, key, value, ver, me)
 		if err == rpc.OK {
+			ver += 1
 			break
 		}
 		if err == rpc.ErrMaybe || err == rpc.ErrVersion {
@@ -92,17 +95,27 @@ func (ts *Test) PutAtLeastOnce(ck IKVClerk, key, value string, ver rpc.Tversion,
 			}
 		}
 	}
+	desp := fmt.Sprintf("Put(%v, %v) completes", key, value)
+	details := fmt.Sprintf("version: %v -> %v", verPrev, ver)
+	tester.AnnotateInfo(desp, details)
 	return ver
 }
 
 func (ts *Test) CheckGet(ck IKVClerk, key, value string, version rpc.Tversion) {
+	tester.AnnotateCheckerBegin(fmt.Sprintf("checking Get(%v) = (%v, %v)", key, value, version))
 	val, ver, err := ts.Get(ck, key, 0)
 	if err != rpc.OK {
-		ts.Fatalf("CheckGet err %v", err)
+		text := fmt.Sprintf("Get(%v) returns error = %v", key, err)
+		tester.AnnotateCheckerFailure(text, text)
+		ts.Fatalf(text)
 	}
-	if val != value || ver != ver {
-		ts.Fatalf("Get(%v): expected:\n%v %v\nreceived:\n%v %v", key, value, val, version, ver)
+	if val != value || ver != version {
+		text := fmt.Sprintf("Get(%v) returns (%v, %v) != (%v, %v)", key, val, ver, value, version)
+		tester.AnnotateCheckerFailure(text, text)
+		ts.Fatalf(text)
 	}
+	text := fmt.Sprintf("Get(%v) returns (%v, %v) as expected", key, val, ver)
+	tester.AnnotateCheckerSuccess(text, "OK")
 }
 
 type ClntRes struct {
@@ -214,9 +227,10 @@ func (ts *Test) OnePut(me int, ck IKVClerk, key string, ver rpc.Tversion) (rpc.T
 
 // repartition the servers periodically
 func (ts *Test) Partitioner(gid tester.Tgid, ch chan bool) {
+	//log.Printf("partioner %v", gid)
 	defer func() { ch <- true }()
 	for true {
-		switch {
+		select {
 		case <-ch:
 			return
 		default:
@@ -234,6 +248,7 @@ func (ts *Test) Partitioner(gid tester.Tgid, ch chan bool) {
 				}
 			}
 			ts.Group(gid).Partition(pa[0], pa[1])
+			tester.AnnotateTwoPartitions(pa[0], pa[1])
 			time.Sleep(ElectionTimeout + time.Duration(rand.Int63()%200)*time.Millisecond)
 		}
 	}
