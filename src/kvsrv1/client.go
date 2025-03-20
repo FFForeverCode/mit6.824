@@ -41,7 +41,7 @@ func (ck *Clerk) Get(key string) (string, rpc.Tversion, rpc.Err) {
 // performed at the server. If the server returns ErrVersion on a
 // resend RPC, then Put must return ErrMaybe to the application, since
 // its earlier RPC might have been processed by the server successfully
-// but the response was lost, and the the Clerk doesn't know if
+// but the response was lost, and the Clerk doesn't know if
 // the Put was performed or not.
 //
 // You can send an RPC with code like this:

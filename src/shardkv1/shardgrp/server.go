@@ -14,11 +14,10 @@ import (
 
 
 type KVServer struct {
-	gid    tester.Tgid
-	me     int
-	dead   int32 // set by Kill()
-	rsm    *rsm.RSM
-	frozen bool // for testing purposes
+	gid  tester.Tgid
+	me   int
+	dead int32 // set by Kill()
+	rsm  *rsm.RSM
 
 }
 

@@ -50,6 +50,8 @@ func MakeTestMaxRaft(t *testing.T, part string, reliable, leases bool, maxraftst
 	}
 	cfg := tester.MakeConfig(t, 1, reliable, kvsrv.StartKVServer)
 	ts.Test = kvtest.MakeTest(t, cfg, false, ts)
+	// XXX to avoid panic
+	tester.AnnotateTest(part, 1)
 	ts.Begin(part)
 	return ts
 }
@@ -125,48 +127,56 @@ func (ts *Test) StartServerShardGrp(servers []*labrpc.ClientEnd, gid tester.Tgid
 	return shardgrp.StartServerShardGrp(servers, gid, me, persister, ts.maxraftstate)
 }
 
+func (ts *Test) checkMember(sck *shardctrler.ShardCtrler, gid tester.Tgid) bool {
+	cfg, _ := sck.Query()
+	ok := cfg.IsMember(gid)
+	return ok
+}
+
 // Add group gid
-func (ts *Test) join(sck *shardctrler.ShardCtrler, gid tester.Tgid, srvs []string) rpc.Err {
+func (ts *Test) join(sck *shardctrler.ShardCtrler, gid tester.Tgid, srvs []string) {
 	cfg, _ := sck.Query()
 	newcfg := cfg.Copy()
 	ok := newcfg.JoinBalance(map[tester.Tgid][]string{gid: srvs})
 	if !ok {
 		log.Fatalf("join: group %d is already present", gid)
 	}
-	return sck.ChangeConfigTo(newcfg)
+	sck.ChangeConfigTo(newcfg)
 }
 
-func (ts *Test) joinGroups(sck *shardctrler.ShardCtrler, gids []tester.Tgid) rpc.Err {
+func (ts *Test) joinGroups(sck *shardctrler.ShardCtrler, gids []tester.Tgid) bool {
 	for _, gid := range gids {
 		ts.Config.MakeGroupStart(gid, NSRV, ts.StartServerShardGrp)
-		if err := ts.join(sck, gid, ts.Group(gid).SrvNames()); err != rpc.OK {
-			return err
+		ts.join(sck, gid, ts.Group(gid).SrvNames())
+		if ok := ts.checkMember(sck, gid); !ok {
+			return false
 		}
 		time.Sleep(INTERGRPDELAY * time.Millisecond)
 	}
-	return rpc.OK
+	return true
 }
 
 // Group gid leaves.
-func (ts *Test) leave(sck *shardctrler.ShardCtrler, gid tester.Tgid) rpc.Err {
+func (ts *Test) leave(sck *shardctrler.ShardCtrler, gid tester.Tgid) {
 	cfg, _ := sck.Query()
 	newcfg := cfg.Copy()
 	ok := newcfg.LeaveBalance([]tester.Tgid{gid})
 	if !ok {
 		log.Fatalf("leave: group %d is already not present", gid)
 	}
-	return sck.ChangeConfigTo(newcfg)
+	sck.ChangeConfigTo(newcfg)
 }
 
-func (ts *Test) leaveGroups(sck *shardctrler.ShardCtrler, gids []tester.Tgid) rpc.Err {
+func (ts *Test) leaveGroups(sck *shardctrler.ShardCtrler, gids []tester.Tgid) bool {
 	for _, gid := range gids {
-		if err := ts.leave(sck, gid); err != rpc.OK {
-			return err
+		ts.leave(sck, gid)
+		if ok := ts.checkMember(sck, gid); ok {
+			return false
 		}
 		ts.Config.ExitGroup(gid)
 		time.Sleep(INTERGRPDELAY * time.Millisecond)
 	}
-	return rpc.OK
+	return true
 }
 
 func (ts *Test) disconnectRaftLeader(gid tester.Tgid) (int, string) {
@@ -257,9 +267,7 @@ func (ts *Test) killCtrler(ck kvtest.IKVClerk, gid tester.Tgid, ka, va []string)
 	)
 
 	sck, clnt := ts.makeShardCtrlerClnt()
-	if err := sck.InitController(); err != rpc.OK {
-		ts.Fatalf("failed to init controller %v", err)
-	}
+	sck.InitController()
 
 	cfg, _ := ts.ShardCtrler().Query()
 	num := cfg.Num
@@ -270,12 +278,12 @@ func (ts *Test) killCtrler(ck kvtest.IKVClerk, gid tester.Tgid, ka, va []string)
 		for {
 			ngid = ts.newGid()
 			state = JOIN
-			err := ts.joinGroups(sck, []tester.Tgid{ngid})
-			if err == rpc.OK {
+			ts.joinGroups(sck, []tester.Tgid{ngid})
+			if ok := ts.checkMember(sck, ngid); ok {
 				state = LEAVE
-				err = ts.leaveGroups(sck, []tester.Tgid{ngid})
+				ts.leaveGroups(sck, []tester.Tgid{ngid})
 			} else {
-				//log.Printf("deposed err %v", err)
+				//log.Printf("deposed")
 				return
 			}
 		}
@@ -306,9 +314,8 @@ func (ts *Test) killCtrler(ck kvtest.IKVClerk, gid tester.Tgid, ka, va []string)
 
 	// start new controler to pick up where sck left off
 	sck0, clnt0 := ts.makeShardCtrlerClnt()
-	if err := sck0.InitController(); err != rpc.OK {
-		ts.Fatalf("failed to init controller %v", err)
-	}
+
+	sck0.InitController()
 	cfg, _ = sck0.Query()
 	s := "join"
 	if state == LEAVE {
@@ -337,6 +344,8 @@ func (ts *Test) killCtrler(ck kvtest.IKVClerk, gid tester.Tgid, ka, va []string)
 	sck0.ExitController()
 
 	if ts.leases {
+		//log.Printf("reconnect old controller")
+
 		// reconnect old controller, which should bail out, because
 		// it has been superseded.
 		clnt.ConnectAll()
@@ -366,12 +375,15 @@ func (ts *Test) electCtrler(ck kvtest.IKVClerk, ka, va []string) {
 			default:
 				ngid := ts.newGid()
 				sck := ts.makeShardCtrler()
-				if err := sck.InitController(); err != rpc.OK {
-					ts.Fatalf("failed to init controller %v", err)
-				}
+				sck.InitController()
 				//log.Printf("%d(%p): join/leave %v", i, sck, ngid)
-				if err := ts.joinGroups(sck, []tester.Tgid{ngid}); err == rpc.OK {
-					ts.leaveGroups(sck, []tester.Tgid{ngid})
+				ts.joinGroups(sck, []tester.Tgid{ngid})
+				if ok := ts.checkMember(sck, ngid); ok {
+					if ok := ts.leaveGroups(sck, []tester.Tgid{ngid}); !ok {
+						log.Fatalf("electCtrler: %d(%p): leave %v failed", i, sck, ngid)
+					}
+				} else {
+					log.Fatalf("electCtrler: %d(%p): join %v failed", i, sck, ngid)
 				}
 				sck.ExitController()
 			}

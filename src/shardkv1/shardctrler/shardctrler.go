@@ -39,12 +39,8 @@ func MakeShardCtrler(clnt *tester.Clnt, leases bool) *ShardCtrler {
 // The tester calls InitController() before starting a new
 // controller. In part A, this method doesn't need to do anything. In
 // B and C, this method implements recovery (part B) and uses a lock
-// to become leader (part C). InitController should return
-// rpc.ErrVersion when another controller supersedes it (e.g., when
-// this controller is partitioned during recovery); this happens only
-// in Part C. Otherwise, it returns rpc.OK.
-func (sck *ShardCtrler) InitController() rpc.Err {
-	return rpc.ErrVersion
+// to become leader (part C).
+func (sck *ShardCtrler) InitController() {
 }
 
 // The tester calls ExitController to exit a controller. In part B and
@@ -61,12 +57,11 @@ func (sck *ShardCtrler) InitConfig(cfg *shardcfg.ShardConfig) {
 }
 
 // Called by the tester to ask the controller to change the
-// configuration from the current one to new. It should return
-// rpc.ErrVersion if this controller is superseded by another
-// controller, as in part C.  In all other cases, it should return
-// rpc.OK.
-func (sck *ShardCtrler) ChangeConfigTo(new *shardcfg.ShardConfig) rpc.Err {
-	return rpc.OK
+// configuration from the current one to new.  While the controller
+// changes the configuration it may be superseded by another
+// controller.
+func (sck *ShardCtrler) ChangeConfigTo(new *shardcfg.ShardConfig) {
+	return
 }
 
 // Tester "kills" shardctrler by calling Kill().  For your
