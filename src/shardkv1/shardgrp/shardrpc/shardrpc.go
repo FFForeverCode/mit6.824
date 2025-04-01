@@ -5,18 +5,16 @@ import (
 	"6.5840/shardkv1/shardcfg"
 )
 
-// Same as Put in kvsrv1/rpc, but with a configuration number
+// Same as Put in kvsrv1/rpc
 type PutArgs struct {
 	Key     string
 	Value   string
 	Version rpc.Tversion
-	Num     shardcfg.Tnum
 }
 
-// Same as Get in kvsrv1/rpc, but with a configuration number.
+// Same as Get in kvsrv1/rpc
 type GetArgs struct {
 	Key string
-	Num shardcfg.Tnum
 }
 
 type FreezeArgs struct {
