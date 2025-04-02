@@ -11,7 +11,7 @@ import (
 type Clerk struct {
 	clnt    *tester.Clnt
 	servers []string
-	leader  int // last successful leader (index into servers[])
+	// You will have to modify this struct.
 }
 
 func MakeClerk(clnt *tester.Clnt, servers []string) *Clerk {
