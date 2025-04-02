@@ -30,13 +30,16 @@ func (ck *Clerk) Put(key string, value string, version rpc.Tversion) rpc.Err {
 }
 
 func (ck *Clerk) FreezeShard(s shardcfg.Tshid, num shardcfg.Tnum) ([]byte, rpc.Err) {
+	// Your code here
 	return nil, ""
 }
 
 func (ck *Clerk) InstallShard(s shardcfg.Tshid, state []byte, num shardcfg.Tnum) rpc.Err {
+	// Your code here
 	return ""
 }
 
 func (ck *Clerk) DeleteShard(s shardcfg.Tshid, num shardcfg.Tnum) rpc.Err {
+	// Your code here
 	return ""
 }
