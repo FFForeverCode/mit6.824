@@ -57,9 +57,9 @@ func (sck *ShardCtrler) ChangeConfigTo(new *shardcfg.ShardConfig) {
 }
 
 
-// Return the current configuration and its version number
-func (sck *ShardCtrler) Query() (*shardcfg.ShardConfig, rpc.Tversion) {
+// Return the current configuration
+func (sck *ShardCtrler) Query() *shardcfg.ShardConfig {
 	// Your code here.
-	return nil, 0
+	return nil
 }
 

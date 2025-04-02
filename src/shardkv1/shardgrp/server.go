@@ -37,17 +37,17 @@ func (kv *KVServer) Restore(data []byte) {
 	// Your code here
 }
 
-func (kv *KVServer) Get(args *shardrpc.GetArgs, reply *rpc.GetReply) {
+func (kv *KVServer) Get(args *rpc.GetArgs, reply *rpc.GetReply) {
 	// Your code here
 }
 
-func (kv *KVServer) Put(args *shardrpc.PutArgs, reply *rpc.PutReply) {
+func (kv *KVServer) Put(args *rpc.PutArgs, reply *rpc.PutReply) {
 	// Your code here
 }
 
 // Freeze the specified shard (i.e., reject future Get/Puts for this
 // shard) and return the key/values stored in that shard.
-func (kv *KVServer) Freeze(args *shardrpc.FreezeArgs, reply *shardrpc.FreezeReply) {
+func (kv *KVServer) FreezeShard(args *shardrpc.FreezeShardArgs, reply *shardrpc.FreezeShardReply) {
 	// Your code here
 }
 
@@ -57,7 +57,7 @@ func (kv *KVServer) InstallShard(args *shardrpc.InstallShardArgs, reply *shardrp
 }
 
 // Delete the specified shard.
-func (kv *KVServer) Delete(args *shardrpc.DeleteShardArgs, reply *shardrpc.DeleteShardReply) {
+func (kv *KVServer) DeleteShard(args *shardrpc.DeleteShardArgs, reply *shardrpc.DeleteShardReply) {
 	// Your code here
 }
 
@@ -86,9 +86,9 @@ func (kv *KVServer) killed() bool {
 func StartServerShardGrp(servers []*labrpc.ClientEnd, gid tester.Tgid, me int, persister *tester.Persister, maxraftstate int) []tester.IService {
 	// call labgob.Register on structures you want
 	// Go's RPC library to marshall/unmarshall.
-	labgob.Register(shardrpc.PutArgs{})
-	labgob.Register(shardrpc.GetArgs{})
-	labgob.Register(shardrpc.FreezeArgs{})
+	labgob.Register(rpc.PutArgs{})
+	labgob.Register(rpc.GetArgs{})
+	labgob.Register(shardrpc.FreezeShardArgs{})
 	labgob.Register(shardrpc.InstallShardArgs{})
 	labgob.Register(shardrpc.DeleteShardArgs{})
 	labgob.Register(rsm.Op{})

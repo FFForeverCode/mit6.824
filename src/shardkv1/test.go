@@ -127,14 +127,14 @@ func (ts *Test) StartServerShardGrp(servers []*labrpc.ClientEnd, gid tester.Tgid
 }
 
 func (ts *Test) checkMember(sck *shardctrler.ShardCtrler, gid tester.Tgid) bool {
-	cfg, _ := sck.Query()
+	cfg := sck.Query()
 	ok := cfg.IsMember(gid)
 	return ok
 }
 
 // Add group gid
 func (ts *Test) join(sck *shardctrler.ShardCtrler, gid tester.Tgid, srvs []string) {
-	cfg, _ := sck.Query()
+	cfg := sck.Query()
 	newcfg := cfg.Copy()
 	ok := newcfg.JoinBalance(map[tester.Tgid][]string{gid: srvs})
 	if !ok {
@@ -157,7 +157,7 @@ func (ts *Test) joinGroups(sck *shardctrler.ShardCtrler, gids []tester.Tgid) boo
 
 // Group gid leaves.
 func (ts *Test) leave(sck *shardctrler.ShardCtrler, gid tester.Tgid) {
-	cfg, _ := sck.Query()
+	cfg := sck.Query()
 	newcfg := cfg.Copy()
 	ok := newcfg.LeaveBalance([]tester.Tgid{gid})
 	if !ok {
@@ -267,7 +267,7 @@ func (ts *Test) partitionCtrler(ck kvtest.IKVClerk, gid tester.Tgid, ka, va []st
 	sck, clnt := ts.makeShardCtrlerClnt()
 	sck.InitController()
 
-	cfg, _ := ts.ShardCtrler().Query()
+	cfg := ts.ShardCtrler().Query()
 	num := cfg.Num
 
 	state := 0
@@ -320,7 +320,7 @@ func (ts *Test) partitionCtrler(ck kvtest.IKVClerk, gid tester.Tgid, ka, va []st
 	sck0, clnt0 := ts.makeShardCtrlerClnt()
 
 	sck0.InitController()
-	cfg, _ = sck0.Query()
+	cfg = sck0.Query()
 	s := "join"
 	if state == LEAVE {
 		s = "leave"

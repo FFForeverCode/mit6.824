@@ -40,9 +40,9 @@ func TestInitQuery5A(t *testing.T) {
 	sck.InitConfig(scfg)
 
 	// Read the initial configuration and check it
-	cfg, v := sck.Query()
-	if v != 1 || cfg.Num != 1 || cfg.Shards[0] != shardcfg.Gid1 {
-		ts.t.Fatalf("Static wrong %v %v", cfg, v)
+	cfg := sck.Query()
+	if cfg.Num != 1 || cfg.Shards[0] != shardcfg.Gid1 {
+		ts.t.Fatalf("Static wrong %v", cfg)
 	}
 	cfg.CheckConfig(t, []tester.Tgid{shardcfg.Gid1})
 }
@@ -86,14 +86,14 @@ func TestJoinBasic5A(t *testing.T) {
 	ka, va := ts.SpreadPuts(ck, NKEYS)
 
 	sck := ts.ShardCtrler()
-	cfg, _ := sck.Query()
+	cfg := sck.Query()
 
 	gid2 := ts.newGid()
 	if ok := ts.joinGroups(sck, []tester.Tgid{gid2}); !ok {
 		ts.t.Fatalf("TestJoinBasic5A: joinGroups failed")
 	}
 
-	cfg1, _ := sck.Query()
+	cfg1 := sck.Query()
 	if cfg.Num+1 != cfg1.Num {
 		ts.t.Fatalf("TestJoinBasic5A: wrong num %d expected %d ", cfg1.Num, cfg.Num+1)
 	}
@@ -269,7 +269,7 @@ func TestShutdown5A(t *testing.T) {
 
 // Test that Gets for keys at groups that are alive
 // return
-func TestProgressShutdown(t *testing.T) {
+func TestProgressShutdown5A(t *testing.T) {
 	const (
 		NJOIN = 4
 		NSEC  = 2
@@ -298,7 +298,7 @@ func TestProgressShutdown(t *testing.T) {
 		alive[g] = true
 	}
 
-	cfg, _ := sck.Query()
+	cfg := sck.Query()
 
 	ch := make(chan rpc.Err)
 	go func() {
@@ -321,7 +321,7 @@ func TestProgressShutdown(t *testing.T) {
 }
 
 // Test that Gets from a non-moving shard return quickly
-func TestProgressJoin(t *testing.T) {
+func TestProgressJoin5A(t *testing.T) {
 	const (
 		NJOIN = 4
 		NSEC  = 4
@@ -340,7 +340,7 @@ func TestProgressJoin(t *testing.T) {
 	grps := ts.groups(NJOIN)
 	ts.joinGroups(sck, grps)
 
-	cfg, _ := sck.Query()
+	cfg := sck.Query()
 	newcfg := cfg.Copy()
 	newgid := tester.Tgid(NJOIN + 3)
 	if ok := newcfg.JoinBalance(map[tester.Tgid][]string{newgid: []string{"xxx"}}); !ok {
@@ -491,7 +491,7 @@ func TestJoinLeave5B(t *testing.T) {
 	ka, va := ts.SpreadPuts(ck, NKEYS)
 
 	sck := ts.ShardCtrler()
-	cfg, _ := sck.Query()
+	cfg := sck.Query()
 
 	ts.Group(gid1).Shutdown()
 
@@ -520,7 +520,7 @@ func TestJoinLeave5B(t *testing.T) {
 		ts.Fatalf("Join didn't complete")
 	}
 
-	cfg1, _ := sck.Query()
+	cfg1 := sck.Query()
 	if cfg.Num+1 != cfg1.Num {
 		ts.t.Fatalf("wrong num %d expected %d ", cfg1.Num, cfg.Num+1)
 	}
@@ -636,7 +636,7 @@ func TestPartitionControllerJoin5C(t *testing.T) {
 	sck0 := ts.makeShardCtrler()
 	sck0.InitController()
 
-	scfg, _ := sck0.Query()
+	scfg := sck0.Query()
 	if !scfg.IsMember(ngid) {
 		t.Fatalf("Didn't recover gid %d", ngid)
 	}
