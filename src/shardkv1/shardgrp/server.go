@@ -19,6 +19,7 @@ type KVServer struct {
 	rsm  *rsm.RSM
 	gid  tester.Tgid
 
+	// Your code here
 }
 
 
@@ -97,5 +98,6 @@ func StartServerShardGrp(servers []*labrpc.ClientEnd, gid tester.Tgid, me int, p
 	kv.rsm = rsm.MakeRSM(servers, me, persister, maxraftstate, kv)
 
 	// Your code here
+
 	return []tester.IService{kv, kv.rsm.Raft()}
 }
