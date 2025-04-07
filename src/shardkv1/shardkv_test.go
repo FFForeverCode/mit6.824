@@ -67,7 +67,7 @@ func TestStaticOneShardGroup5A(t *testing.T) {
 
 	// disconnect raft leader of shardgrp and check that keys are
 	// still available
-	ts.disconnectClntFromLeader(ck.(*kvtest.TestClerk).Clnt, shardcfg.Gid1)
+	ts.disconnectClntFromLeader(shardcfg.Gid1)
 
 	for i := 0; i < n; i++ {
 		ts.CheckGet(ck, ka[i], va[i], rpc.Tversion(1)) // check the puts

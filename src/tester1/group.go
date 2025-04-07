@@ -299,19 +299,6 @@ func (sg *ServerGrp) MakePartition(l int) ([]int, []int) {
 	return p1, p2
 }
 
-func (sg *ServerGrp) AllowServersExcept(l int) []int {
-	n := len(sg.srvs) - 1
-	p := make([]int, n)
-	j := 0
-	for i, _ := range sg.srvs {
-		if i != l {
-			p[j] = i
-			j++
-		}
-	}
-	return p
-}
-
 func (sg *ServerGrp) Partition(p1 []int, p2 []int) {
 	//log.Printf("partition servers into: %v %v\n", p1, p2)
 	for i := 0; i < len(p1); i++ {

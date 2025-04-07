@@ -178,25 +178,12 @@ func (ts *Test) leaveGroups(sck *shardctrler.ShardCtrler, gids []tester.Tgid) bo
 	return true
 }
 
-func (ts *Test) disconnectRaftLeader(gid tester.Tgid) (int, string) {
-	_, l := rsm.Leader(ts.Config, gid)
-	g := ts.Group(gid)
-	ln := g.SrvName(l)
-	g.DisconnectAll(l)
-	return l, ln
-}
-
-func (ts *Test) reconnectOldLeader(gid tester.Tgid, l int) {
-	g := ts.Group(gid)
-	g.ConnectOne(l)
-}
-
-func (ts *Test) disconnectClntFromLeader(clnt *tester.Clnt, gid tester.Tgid) int {
-	l, ln := ts.disconnectRaftLeader(gid)
-	p := ts.Group(gid).AllowServersExcept(l)
-	srvs := ts.Group(gid).SrvNamesTo(p)
-	clnt.Disconnect(ln)
-	clnt.ConnectTo(srvs)
+func (ts *Test) disconnectClntFromLeader(gid tester.Tgid) int {
+	ok, l := rsm.Leader(ts.Config, gid)
+	if !ok {
+		log.Fatalf("Leader failed")
+	}
+	ts.Group(gid).ShutdownServer(l)
 	return l
 }
 
