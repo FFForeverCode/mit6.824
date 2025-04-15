@@ -63,7 +63,7 @@ func TestPutConcurrentReliable(t *testing.T) {
 		return ts.OneClientPut(me, ck, []string{"k"}, done)
 	})
 	ck := ts.MakeClerk()
-	ts.CheckPutConcurrent(ck, "k", rs, &kvtest.ClntRes{})
+	ts.CheckPutConcurrent(ck, "k", rs, &kvtest.ClntRes{}, ts.IsReliable())
 	ts.CheckPorcupineT(PORCUPINETIME)
 }
 

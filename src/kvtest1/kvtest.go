@@ -2,8 +2,8 @@ package kvtest
 
 import (
 	"encoding/json"
-	//"log"
 	"fmt"
+	//"log"
 	"math/rand"
 	"strconv"
 	"testing"
@@ -123,18 +123,19 @@ type ClntRes struct {
 	Nmaybe int
 }
 
-func (ts *Test) CheckPutConcurrent(ck IKVClerk, key string, rs []ClntRes, res *ClntRes) {
+func (ts *Test) CheckPutConcurrent(ck IKVClerk, key string, rs []ClntRes, res *ClntRes, reliable bool) {
 	e := EntryV{}
 	ver0 := ts.GetJson(ck, key, -1, &e)
 	for _, r := range rs {
 		res.Nok += r.Nok
 		res.Nmaybe += r.Nmaybe
 	}
-	if !ts.IsReliable() && ver0 > rpc.Tversion(res.Nok+res.Nmaybe) {
-		ts.Fatalf("Wrong number of puts: server %d clnts %v", ver0, res)
-	}
-	if ts.IsReliable() && ver0 != rpc.Tversion(res.Nok) {
-		ts.Fatalf("Wrong number of puts: server %d clnts %v", ver0, res)
+	if reliable {
+		if ver0 != rpc.Tversion(res.Nok) {
+			ts.Fatalf("Reliable: Wrong number of puts: server %d clnts %v", ver0, res)
+		}
+	} else if ver0 > rpc.Tversion(res.Nok+res.Nmaybe) {
+		ts.Fatalf("Unreliable: Wrong number of puts: server %d clnts %v", ver0, res)
 	}
 }
 

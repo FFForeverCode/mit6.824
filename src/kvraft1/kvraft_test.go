@@ -1,11 +1,11 @@
 package kvraft
 
 import (
+	"fmt"
 	//"log"
 	"strconv"
 	"testing"
 	"time"
-	"fmt"
 
 	"6.5840/kvraft1/rsm"
 	"6.5840/kvsrv1/rpc"
@@ -53,7 +53,8 @@ func (ts *Test) GenericTest() {
 				return ts.OneClientPut(cli, ck, default_key, done)
 			})
 			if !ts.randomkeys {
-				ts.CheckPutConcurrent(ck, default_key[0], rs, &res)
+				reliable := ts.IsReliable() && !ts.crash && !ts.partitions
+				ts.CheckPutConcurrent(ck, default_key[0], rs, &res, reliable)
 			}
 			ch_spawn <- struct{}{}
 		}()
@@ -69,6 +70,7 @@ func (ts *Test) GenericTest() {
 		if i == NITER-1 {
 			tester.SetAnnotationFinalized()
 		}
+
 		ts.CheckPorcupine()
 
 		if ts.partitions {
@@ -179,7 +181,7 @@ func TestConcurrent4B(t *testing.T) {
 }
 
 func TestUnreliable4B(t *testing.T) {
-	ts := MakeTest(t, "4B unreliable net, many clients", 5, 5, false, false, false, -1, false)
+	ts := MakeTest(t, "4B many clients", 5, 5, false, false, false, -1, false)
 	tester.AnnotateTest("TestUnreliable4B", ts.nservers)
 	ts.GenericTest()
 }
@@ -287,49 +289,49 @@ func TestOnePartition4B(t *testing.T) {
 }
 
 func TestManyPartitionsOneClient4B(t *testing.T) {
-	ts := MakeTest(t, "4B partitions, one client", 1, 5, false, false, true, -1, false)
+	ts := MakeTest(t, "4B partitions, one client", 1, 5, true, false, true, -1, false)
 	tester.AnnotateTest("TestManyPartitionsOneClient4B", ts.nservers)
 	ts.GenericTest()
 }
 
 func TestManyPartitionsManyClients4B(t *testing.T) {
-	ts := MakeTest(t, "4B partitions, many clients (4B)", 5, 5, false, false, true, -1, false)
+	ts := MakeTest(t, "4B partitions, many clients (4B)", 5, 5, true, false, true, -1, false)
 	tester.AnnotateTest("TestManyPartitionsManyClients4B", ts.nservers)
 	ts.GenericTest()
 }
 
 func TestPersistOneClient4B(t *testing.T) {
-	ts := MakeTest(t, "4B restarts, one client 4B ", 1, 5, false, true, false, -1, false)
+	ts := MakeTest(t, "4B restarts, one client 4B ", 1, 5, true, true, false, -1, false)
 	tester.AnnotateTest("TestPersistOneClient4B", ts.nservers)
 	ts.GenericTest()
 }
 
 func TestPersistConcurrent4B(t *testing.T) {
-	ts := MakeTest(t, "4B restarts, many clients", 5, 5, false, true, false, -1, false)
+	ts := MakeTest(t, "4B restarts, many clients", 5, 5, true, true, false, -1, false)
 	tester.AnnotateTest("TestPersistConcurrent4B", ts.nservers)
 	ts.GenericTest()
 }
 
 func TestPersistConcurrentUnreliable4B(t *testing.T) {
-	ts := MakeTest(t, "4B unreliable net, restarts, many clients ", 5, 5, true, true, false, -1, false)
+	ts := MakeTest(t, "4B restarts, many clients ", 5, 5, false, true, false, -1, false)
 	tester.AnnotateTest("TestPersistConcurrentUnreliable4B", ts.nservers)
 	ts.GenericTest()
 }
 
 func TestPersistPartition4B(t *testing.T) {
-	ts := MakeTest(t, "4B restarts, partitions, many clients", 5, 5, false, true, true, -1, false)
+	ts := MakeTest(t, "4B restarts, partitions, many clients", 5, 5, true, true, true, -1, false)
 	tester.AnnotateTest("TestPersistPartition4B", ts.nservers)
 	ts.GenericTest()
 }
 
 func TestPersistPartitionUnreliable4B(t *testing.T) {
-	ts := MakeTest(t, "4B unreliable net, restarts, partitions, many clients", 5, 5, true, true, true, -1, false)
+	ts := MakeTest(t, "4B restarts, partitions, many clients", 5, 5, false, true, true, -1, false)
 	tester.AnnotateTest("TestPersistPartitionUnreliable4B", ts.nservers)
 	ts.GenericTest()
 }
 
 func TestPersistPartitionUnreliableLinearizable4B(t *testing.T) {
-	ts := MakeTest(t, "4B unreliable net, restarts, partitions, random keys, many clients", 15, 7, true, true, true, -1, true)
+	ts := MakeTest(t, "4B restarts, partitions, random keys, many clients", 15, 7, false, true, true, -1, true)
 	tester.AnnotateTest("TestPersistPartitionUnreliableLinearizable4B", ts.nservers)
 	ts.GenericTest()
 }
