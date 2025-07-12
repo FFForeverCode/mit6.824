@@ -5,10 +5,8 @@ import "log"
 import "net/rpc"
 import "hash/fnv"
 
-
-//
 // Map functions return a slice of KeyValue.
-//
+// Map的节点
 type KeyValue struct {
 	Key   string
 	Value string
@@ -18,16 +16,16 @@ type KeyValue struct {
 // use ihash(key) % NReduce to choose the reduce
 // task number for each KeyValue emitted by Map.
 //
+/**
+哈希算法-选择reduce节点接受数据进行处理
+*/
 func ihash(key string) int {
 	h := fnv.New32a()
 	h.Write([]byte(key))
 	return int(h.Sum32() & 0x7fffffff)
 }
 
-
-//
 // main/mrworker.go calls this function.
-//
 func Worker(mapf func(string, string) []KeyValue,
 	reducef func(string, []string) string) {
 
@@ -38,11 +36,9 @@ func Worker(mapf func(string, string) []KeyValue,
 
 }
 
-//
 // example function to show how to make an RPC call to the coordinator.
 //
 // the RPC argument and reply types are defined in rpc.go.
-//
 func CallExample() {
 
 	// declare an argument structure.
@@ -72,6 +68,9 @@ func CallExample() {
 // usually returns true.
 // returns false if something goes wrong.
 //
+/**
+当worker节点任务处理完毕后，通过RPC调用coordinator节点，请求获取新任务
+*/
 func call(rpcname string, args interface{}, reply interface{}) bool {
 	// c, err := rpc.DialHTTP("tcp", "127.0.0.1"+":1234")
 	sockname := coordinatorSock()
