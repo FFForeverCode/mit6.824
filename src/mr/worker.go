@@ -3,8 +3,10 @@ package mr
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
+	"regexp"
 	"sort"
 	"time"
 )
@@ -74,22 +76,47 @@ func appendToFile(filename string, result string) {
 
 }
 
-// TODO: implement this
 func aggregateKvs(kvs []KeyValue) map[string][]string {
-	return map[string][]string{}
+	result := make(map[string][]string)
+	for _, kv := range kvs {
+		result[kv.Key] = append(result[kv.Key], kv.Value)
+	}
+	return result
 }
 
 // TODO: implement this
 func readReduceTaskContent(task *Task) []KeyValue {
 	id := task.ReduceId
-	var result []KeyValue = make([]KeyValue)
+	var result []KeyValue
 	// TODO: each file check file name format. if of form "mr-[any]-reduceId" then collect data
+	// TODO: change this to a proper reading file under dir, whi
 	entries, error := os.ReadDir("result/intermediate")
-	if error != nil {
-		log.Fatal(error)
+	for _, entryFile := range entries {
+		// TODO: if this name matches current task reduce id format, then get its json and put in result
+		if matchFileName2ReduceId(entryFile.Name(), id) {
+			kvs := buildJsonFileAsMap(entryFile)
+			result = append(result, kvs...)
+		}
 	}
-	for _, entry := range entries {
+	return result
+}
+
+func matchFileName2ReduceId(name string, id int) bool {
+	pattern := regexp.MustCompile(fmt.Sprintf(`^mr-.*-%d$`, id))
+	return pattern.Match([]byte(name))
+}
+
+func buildJsonFileAsMap(file io.Reader) []KeyValue {
+	dec := json.NewDecoder(file)
+	var result []KeyValue
+	for {
+		var kv KeyValue
+		if err := dec.Decode(&kv); err != nil {
+			break
+		}
+		result = append(result, kv)
 	}
+	return result
 }
 
 func doMap(mapf func(string, string) []KeyValue, task *Task) {
