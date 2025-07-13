@@ -34,10 +34,18 @@ func coordinatorSock() string {
 	return s
 }
 
-type RecvTaskArgs struct {
+type GetTaskWithStatusArgs struct {
+	Status byte
 }
 
-type RecvTaskReply struct {
-	task Task
+type GetTaskWithStatusReply struct {
+	Task    Task
+	HasTask bool
 }
 type NoTaskError struct{}
+
+type FinishTaskargs struct {
+	Task *Task
+}
+
+type FinishTaskReply struct{}

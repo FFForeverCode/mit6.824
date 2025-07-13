@@ -18,25 +18,22 @@ type Coordinator struct {
 	ReduceTaskMap map[int]map[int]Task
 }
 
-type Task struct {
-	Status       byte
-	WorkerId     int
-	Id           int
-	IsMap        bool
-	Mapf         func(string, string) []KeyValue
-	Reducef      func(string, []string) string
-	FileLocation string
-}
-
 func (e NoTaskError) Error() string {
 	return "NoTaskError"
 }
 
 func (c *Coordinator) getTaskWithStatus(status byte) (*Task, bool) {
+	mapIsFinished := true
 	for _, task := range c.MapTaskMap {
 		if task.Status == status {
 			return &task, true
 		}
+		if task.Status != COMPLETED {
+			mapIsFinished = false
+		}
+	}
+	if !mapIsFinished {
+		return nil, false
 	}
 	for _, arr := range c.ReduceTaskMap {
 		for _, task := range arr {
@@ -48,19 +45,32 @@ func (c *Coordinator) getTaskWithStatus(status byte) (*Task, bool) {
 	return nil, false
 }
 
+func (c *Coordinator) FinishTask(task *Task) bool {
+	if task.IsMap {
+		t := c.MapTaskMap[task.MapId]
+		t.Status = COMPLETED
+	} else {
+		t := c.ReduceTaskMap[task.MapId][task.ReduceId]
+		t.Status = COMPLETED
+	}
+	return true
+}
+
 func (c *Coordinator) noIdleTask() bool {
 	_, hasTask := c.getTaskWithStatus(IDLE)
 	return !hasTask
 }
 
 // Your code here -- RPC handlers for the worker to call.
-func (c *Coordinator) GetTask(_ *RecvTaskArgs, reply *RecvTaskReply) error {
-	if c.noIdleTask() {
-		return NoTaskError{}
-	}
+func (c *Coordinator) GetTaskWithStatusRemote(args *GetTaskWithStatusArgs, reply *GetTaskWithStatusReply) error {
+	task, success := c.getTaskWithStatus(args.Status)
+	reply.HasTask = success
+	reply.Task = *task
+	return nil
+}
 
-	taskPtr, _ := c.getTaskWithStatus(IDLE)
-	reply.task = *taskPtr
+func (c *Coordinator) FinishTaskRemote(taskargs *FinishTaskargs, reply *FinishTaskReply) error {
+	c.FinishTask(taskargs.Task)
 	return nil
 }
 
