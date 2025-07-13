@@ -21,9 +21,9 @@ type Task struct {
 	Coordinator   *Coordinator
 }
 
-func (task *Task) GetIntermediateOutputFilePath(reduceId int) string {
+func (task *Task) GetIntermediateOutputFilePath() string {
 	if !task.IsMap {
 		return ""
 	}
-	return "result/intermediate/mr-" + strconv.Itoa(task.MapId) + strconv.Itoa(reduceId)
+	return "result/intermediate/mr-" + strconv.Itoa(task.ReduceId)
 }

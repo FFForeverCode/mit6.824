@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"sort"
 	"time"
 )
 import "log"
@@ -16,6 +17,12 @@ type KeyValue struct {
 	Key   string
 	Value string
 }
+type ByKey []KeyValue
+
+// for sorting by key.
+func (a ByKey) Len() int           { return len(a) }
+func (a ByKey) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByKey) Less(i, j int) bool { return a[i].Key < a[j].Key }
 
 // use ihash(key) % NReduce to choose the reduce
 // task number for each KeyValue emitted by Map.
@@ -50,8 +57,39 @@ func Worker(mapf func(string, string) []KeyValue,
 
 }
 
+// TODO: use json to read back the kv pairs based on reduce number files, sort them, then reduce
 func doReduce(reducef func(string, []string) string, task *Task) {
+	contentKvs := readReduceTaskContent(task)
+	outputFilename := task.GetIntermediateOutputFilePath()
+	sort.Sort(ByKey(contentKvs))
+	k2VsliceMap := aggregateKvs(contentKvs)
+	for k, vSlice := range k2VsliceMap {
+		reduceResult := reducef(k, vSlice)
+		appendToFile(outputFilename, reduceResult)
+	}
+}
 
+// TODO: implement this
+func appendToFile(filename string, result string) {
+
+}
+
+// TODO: implement this
+func aggregateKvs(kvs []KeyValue) map[string][]string {
+	return map[string][]string{}
+}
+
+// TODO: implement this
+func readReduceTaskContent(task *Task) []KeyValue {
+	id := task.ReduceId
+	var result []KeyValue = make([]KeyValue)
+	// TODO: each file check file name format. if of form "mr-[any]-reduceId" then collect data
+	entries, error := os.ReadDir("result/intermediate")
+	if error != nil {
+		log.Fatal(error)
+	}
+	for _, entry := range entries {
+	}
 }
 
 func doMap(mapf func(string, string) []KeyValue, task *Task) {
