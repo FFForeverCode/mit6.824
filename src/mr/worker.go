@@ -1,48 +1,107 @@
 package mr
 
-import "fmt"
-import "log"
-import "net/rpc"
-import "hash/fnv"
+import (
+	"fmt"
+	"hash/fnv"
+	"io"
+	"log"
+	"net/rpc"
+	"os"
+	"sort"
+	"time"
+)
 
-
-//
 // Map functions return a slice of KeyValue.
-//
+// for sorting by key.
+type ByKey []KeyValue
+
+// for sorting by key.
+func (a ByKey) Len() int           { return len(a) }
+func (a ByKey) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByKey) Less(i, j int) bool { return a[i].Key < a[j].Key }
+
 type KeyValue struct {
 	Key   string
 	Value string
 }
 
-//
 // use ihash(key) % NReduce to choose the reduce
 // task number for each KeyValue emitted by Map.
-//
 func ihash(key string) int {
 	h := fnv.New32a()
 	h.Write([]byte(key))
 	return int(h.Sum32() & 0x7fffffff)
 }
 
-
-//
 // main/mrworker.go calls this function.
-//
 func Worker(mapf func(string, string) []KeyValue,
 	reducef func(string, []string) string) {
 
 	// Your worker implementation here.
+	workerNO := -1
+	for {
+		args := RpcArgs{
+			WorkerNO: workerNO,
+		}
+		reply := RpcReply{}
+		ok := call("Coordinator.Rpc", &args, &reply)
+		if ok {
+			if !reply.IsAllocateTask {
+				fmt.Printf("not allocate task\n")
+				time.Sleep(5 * time.Second)
+				continue
+			}
 
+			fmt.Printf("request task -[%v]\n", reply.File)
+			//返回的参数
+			Xmap := reply.TaskNo
+			workerNO = reply.WorkerNo
+			if reply.IsMap {
+				// ============ Map ===========
+				//遍历coordinator 返回的任务，集中到intermediate
+				filename := reply.File
+				file, err := os.Open(filename)
+				if err != nil {
+					log.Fatalf("cannot open %v", filename)
+				}
+				content, err := io.ReadAll(file)
+				if err != nil {
+					log.Fatalf("cannot read %v", filename)
+				}
+				file.Close()
+				//here call the Map
+				kva := mapf(filename, string(content))
+				//将这些kv 划分到 N 个 桶中
+				sort.Sort(ByKey(kva)) //排序一下
+				for _, kv := range kva {
+					hashv := ihash(kv.Key) % reply.Nreduce
+					oname := fmt.Sprintf("mr-%d-%d", Xmap, hashv)
+					ofile, err := os.OpenFile(oname, os.O_RDWR|os.O_CREATE, 0666)
+					if err != nil {
+						log.Fatalf("cannot create or open %v", oname)
+					}
+					//写入对应的桶
+					fmt.Fprintf(ofile, "%v %v\n", kv.Key, kv.Value)
+
+					ofile.Close()
+				}
+			} else {
+				// ============ Reduce ===========
+
+			}
+		} else {
+			fmt.Printf("Worker:call rpc failed\n")
+		}
+		time.Sleep(5 * time.Second)
+	}
 	// uncomment to send the Example RPC to the coordinator.
 	// CallExample()
 
 }
 
-//
 // example function to show how to make an RPC call to the coordinator.
 //
 // the RPC argument and reply types are defined in rpc.go.
-//
 func CallExample() {
 
 	// declare an argument structure.
@@ -67,11 +126,9 @@ func CallExample() {
 	}
 }
 
-//
 // send an RPC request to the coordinator, wait for the response.
 // usually returns true.
 // returns false if something goes wrong.
-//
 func call(rpcname string, args interface{}, reply interface{}) bool {
 	// c, err := rpc.DialHTTP("tcp", "127.0.0.1"+":1234")
 	sockname := coordinatorSock()
