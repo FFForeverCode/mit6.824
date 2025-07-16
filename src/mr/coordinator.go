@@ -126,6 +126,7 @@ func MakeCoordinator(files []string, nReduce int) *Coordinator {
 	// 10 is the factor for mapping
 	c.MapNum = fileNum * nReduce * 10
 	c.ReduceNum = nReduce
+	// TODO: 检查这个初始化是否正确
 	c.MapTaskMap = make(map[int]Task, c.MapNum)
 	c.ReduceTaskMap = make(map[int]map[int]Task, c.MapNum)
 	for k, _ := range c.ReduceTaskMap {

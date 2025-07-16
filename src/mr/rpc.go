@@ -29,7 +29,7 @@ type ExampleReply struct {
 // Can't use the current directory since
 // Athena AFS doesn't support UNIX-domain sockets.
 func coordinatorSock() string {
-	s := "/var/tmp/5840-eddy"
+	s := "/var/tmp/5840-mr-501"
 	s += strconv.Itoa(os.Getuid())
 	return s
 }

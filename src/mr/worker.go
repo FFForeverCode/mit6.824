@@ -3,9 +3,9 @@ package mr
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"time"
@@ -59,21 +59,26 @@ func Worker(mapf func(string, string) []KeyValue,
 
 }
 
-// TODO: use json to read back the kv pairs based on reduce number files, sort them, then reduce
 func doReduce(reducef func(string, []string) string, task *Task) {
-	contentKvs := readReduceTaskContent(task)
-	outputFilename := task.GetIntermediateOutputFilePath()
+	contentKvs := readReduceTaskInputParam(task)
+	outputFilename := task.GetReduceOutputFilePath()
 	sort.Sort(ByKey(contentKvs))
-	k2VsliceMap := aggregateKvs(contentKvs)
-	for k, vSlice := range k2VsliceMap {
+	kvSliceMap := aggregateKvs(contentKvs)
+	for k, vSlice := range kvSliceMap {
 		reduceResult := reducef(k, vSlice)
-		appendToFile(outputFilename, reduceResult)
+		appendToFile(outputFilename, k, reduceResult)
 	}
 }
 
-// TODO: implement this
-func appendToFile(filename string, result string) {
-
+func appendToFile(filename string, key string, val string) {
+	file, err := os.Open(filename)
+	if err != nil {
+		panic(err)
+	}
+	_, err = file.WriteString(fmt.Sprintf("%v %v\n", key, val))
+	if err != nil {
+		panic(err)
+	}
 }
 
 func aggregateKvs(kvs []KeyValue) map[string][]string {
@@ -84,17 +89,17 @@ func aggregateKvs(kvs []KeyValue) map[string][]string {
 	return result
 }
 
-// TODO: implement this
-func readReduceTaskContent(task *Task) []KeyValue {
+func readReduceTaskInputParam(task *Task) []KeyValue {
 	id := task.ReduceId
 	var result []KeyValue
-	// TODO: each file check file name format. if of form "mr-[any]-reduceId" then collect data
-	// TODO: change this to a proper reading file under dir, whi
-	entries, error := os.ReadDir("result/intermediate")
+	const intermediateResultPath = "../result/intermediate"
+	entries, err := os.ReadDir(intermediateResultPath)
+	if err != nil {
+		panic(err)
+	}
 	for _, entryFile := range entries {
-		// TODO: if this name matches current task reduce id format, then get its json and put in result
 		if matchFileName2ReduceId(entryFile.Name(), id) {
-			kvs := buildJsonFileAsMap(entryFile)
+			kvs := buildJsonFileAsMap(entryFile, intermediateResultPath)
 			result = append(result, kvs...)
 		}
 	}
@@ -106,7 +111,12 @@ func matchFileName2ReduceId(name string, id int) bool {
 	return pattern.Match([]byte(name))
 }
 
-func buildJsonFileAsMap(file io.Reader) []KeyValue {
+func buildJsonFileAsMap(dirEntry os.DirEntry, path string) []KeyValue {
+	filePath := filepath.Join(path, dirEntry.Name())
+	file, err := os.Open(filePath)
+	if err != nil {
+		panic(err)
+	}
 	dec := json.NewDecoder(file)
 	var result []KeyValue
 	for {
@@ -129,11 +139,10 @@ func doMap(mapf func(string, string) []KeyValue, task *Task) {
 	signalCoordinatorDone(task)
 }
 
-// TODO: coordinator needs to update the status from input. Also upon starting needs to update the status to inprogress
 func signalCoordinatorDone(task *Task) {
 	args := &FinishTaskargs{Task: task}
 	reply := &FinishTaskReply{}
-	call("FinishTask", args, reply)
+	call("FinishTaskRemote", args, reply)
 }
 
 func appendResultToReduceFileByHashing(kva KeyValue, task *Task) {
