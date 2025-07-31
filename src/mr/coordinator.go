@@ -3,6 +3,7 @@ package mr
 import (
 	"log"
 	"sync"
+	"time"
 )
 import "net"
 import "os"
@@ -16,6 +17,8 @@ const (
 )
 
 var mutexForCoordinator = sync.Mutex{}
+
+var lastDoneTime = time.Now()
 
 type Coordinator struct {
 	// Your definitions here.
@@ -32,8 +35,14 @@ func (c *Coordinator) UpdateStatus(args *UpdateStatusArgs, reply *UpdateStatusRe
 	defer mutexForCoordinator.Unlock()
 	if args.IsMapTask {
 		c.mapTasks[args.Index] = args.Status
+		if args.Status == DONE {
+			lastDoneTime = time.Now()
+		}
 	} else {
 		c.reduceTasks[args.Index] = args.Status
+		if args.Status == DONE {
+			lastDoneTime = time.Now()
+		}
 	}
 	return nil
 }
@@ -100,12 +109,13 @@ func (c *Coordinator) server() {
 // main/mrcoordinator.go calls Done() periodically to find out
 // if the entire job has finished.
 func (c *Coordinator) Done() bool {
-	ret := false
+	ret := true
 
 	// Your code here.
 	for _, task := range c.reduceTasks {
 		if task != DONE {
 			ret = false
+			break
 		}
 	}
 
@@ -132,4 +142,9 @@ func MakeCoordinator(files []string, nReduce int) *Coordinator {
 	c.inputFiles = files
 	c.server()
 	return &c
+}
+
+func ensureTaskProcessing() {
+	if lastDoneTime.Add(1 * time.Second).Before(time.Now()) {
+	}
 }

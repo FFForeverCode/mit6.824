@@ -3,7 +3,6 @@ package mr
 import (
 	"encoding/json"
 	"fmt"
-	"io/fs"
 	"os"
 	"sort"
 	"strconv"
@@ -43,7 +42,6 @@ func Worker(mapf func(string, string) []KeyValue,
 
 	// Your worker implementation here.
 	for {
-		fmt.Printf("worker.go: starting task.\n")
 		var reply GetTaskReply
 		mutex.Lock()
 		if !call("Coordinator.GetTask", &GetTaskArgs{}, &reply) {
@@ -56,14 +54,12 @@ func Worker(mapf func(string, string) []KeyValue,
 			continue
 		}
 		if reply.IsMapTask {
-			fmt.Printf("worker.go: task is a map task.\n")
 			call("Coordinator.UpdateStatus", &UpdateStatusArgs{
 				Status:    IN_PROGRESS,
 				Index:     reply.TaskIndex,
 				IsMapTask: true,
 			}, &UpdateStatusReply{})
 			mutex.Unlock()
-			fmt.Printf("worker.go: map task IN_PROGRESS.\n")
 			DoMapTask(mapf, reply)
 		} else {
 			call("Coordinator.UpdateStatus", &UpdateStatusArgs{
@@ -89,9 +85,8 @@ func DoMapTask(mapf func(string, string) []KeyValue, reply GetTaskReply) {
 	file.Close()
 	contentStr := string(content)
 	resultKv := mapf(inputFileName, contentStr)
-	fmt.Printf("worker.go: map task doing: %s.\n", resultKv)
 	for _, kv := range resultKv {
-		intermediateFileName := "mr-" + strconv.Itoa(reply.TaskIndex) + "-" + strconv.Itoa(ihash(inputFileName)%reply.NReduce)
+		intermediateFileName := "mr-" + strconv.Itoa(reply.TaskIndex) + "-" + strconv.Itoa(ihash(kv.Key)%reply.NReduce)
 		intermediateFile, _ := os.OpenFile(intermediateFileName, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
 		enc := json.NewEncoder(intermediateFile)
 		enc.Encode(&kv)
@@ -105,7 +100,6 @@ func DoMapTask(mapf func(string, string) []KeyValue, reply GetTaskReply) {
 }
 
 func DoReduceTask(reducef func(string, []string) string, reply GetTaskReply) {
-	fmt.Printf("worker.go: reduce task doing: %s.\n", reply.TaskIndex)
 	kva := make([]KeyValue, 0)
 	for i := 0; i < reply.NReduce; i++ {
 		intermediateFile, _ := os.Open("mr-" + strconv.Itoa(i) + "-" + strconv.Itoa(reply.TaskIndex))
@@ -124,11 +118,25 @@ func DoReduceTask(reducef func(string, []string) string, reply GetTaskReply) {
 	for _, kv := range kva {
 		kvMap[kv.Key] = append(kvMap[kv.Key], kv.Value)
 	}
-	for k, arrV := range kvMap {
-		result := reducef(k, arrV)
-		fileLine := k + " " + result
-		os.WriteFile("mr-"+strconv.Itoa(reply.TaskIndex), []byte(fileLine), fs.ModeAppend)
+	lastK := ""
+	for _, kv := range kva {
+		k := kv.Key
+		if lastK == k {
+			continue
+		}
+		lastK = k
+		vArr := kvMap[k]
+		result := reducef(k, vArr)
+		fileLine := k + " " + result + "\n"
+		file, _ := os.OpenFile("mr-"+"out-"+strconv.Itoa(reply.TaskIndex), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+		file.Write([]byte(fileLine))
+		file.Close()
 	}
+	call("Coordinator.UpdateStatus", &UpdateStatusArgs{
+		Status:    DONE,
+		Index:     reply.TaskIndex,
+		IsMapTask: false,
+	}, &UpdateStatusReply{})
 }
 
 // example function to show how to make an RPC call to the coordinator.
