@@ -1,6 +1,7 @@
 package mr
 
 import (
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -17,6 +18,7 @@ const (
 )
 
 var mutexForCoordinator = sync.Mutex{}
+var isUpdating = sync.Mutex{}
 
 var lastDoneTime = time.Now()
 
@@ -33,15 +35,25 @@ type Coordinator struct {
 func (c *Coordinator) UpdateStatus(args *UpdateStatusArgs, reply *UpdateStatusReply) error {
 	mutexForCoordinator.Lock()
 	defer mutexForCoordinator.Unlock()
+	reply.CanUpdate = true
 	if args.IsMapTask {
-		c.mapTasks[args.Index] = args.Status
-		if args.Status == DONE {
-			lastDoneTime = time.Now()
+		if c.mapTasks[args.Index] == DONE {
+			reply.CanUpdate = false
+		} else {
+			c.mapTasks[args.Index] = args.Status
+			if args.Status == DONE {
+				lastDoneTime = time.Now()
+			}
 		}
 	} else {
-		c.reduceTasks[args.Index] = args.Status
-		if args.Status == DONE {
-			lastDoneTime = time.Now()
+		if c.reduceTasks[args.Index] == DONE {
+			reply.CanUpdate = false
+		} else {
+			fmt.Println("update reduce task status: ", args.Index, args.Status)
+			c.reduceTasks[args.Index] = args.Status
+			if args.Status == DONE {
+				lastDoneTime = time.Now()
+			}
 		}
 	}
 	return nil
@@ -50,6 +62,7 @@ func (c *Coordinator) UpdateStatus(args *UpdateStatusArgs, reply *UpdateStatusRe
 func (c *Coordinator) GetTask(args *GetTaskArgs, reply *GetTaskReply) error {
 	reply.TaskIndex = -1
 	isDoneMapping := true
+	fmt.Println("c.reduceTasks: ", c.reduceTasks)
 	for index, task := range c.mapTasks {
 		mutexForCoordinator.Lock()
 		if task == PENDING {
@@ -140,11 +153,29 @@ func MakeCoordinator(files []string, nReduce int) *Coordinator {
 		c.reduceTasks[i] = PENDING
 	}
 	c.inputFiles = files
+	go c.ensureTaskProcessing()
 	c.server()
 	return &c
 }
 
-func ensureTaskProcessing() {
-	if lastDoneTime.Add(1 * time.Second).Before(time.Now()) {
+func (c *Coordinator) ensureTaskProcessing() {
+	for {
+		if lastDoneTime.Add(30 * time.Second).Before(time.Now()) {
+			for index, _ := range c.mapTasks {
+				isUpdating.Lock()
+				if c.mapTasks[index] == IN_PROGRESS {
+					c.mapTasks[index] = PENDING
+				}
+				isUpdating.Unlock()
+			}
+			for index, _ := range c.reduceTasks {
+				isUpdating.Lock()
+				if c.reduceTasks[index] == IN_PROGRESS {
+					c.reduceTasks[index] = PENDING
+				}
+				isUpdating.Unlock()
+			}
+		}
+		time.Sleep(10 * time.Second)
 	}
 }

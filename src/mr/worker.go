@@ -3,7 +3,9 @@ package mr
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
+	"regexp"
 	"sort"
 	"strconv"
 	"sync"
@@ -44,12 +46,19 @@ func Worker(mapf func(string, string) []KeyValue,
 	for {
 		var reply GetTaskReply
 		mutex.Lock()
-		if !call("Coordinator.GetTask", &GetTaskArgs{}, &reply) {
+		isSuccess := call("Coordinator.GetTask", &GetTaskArgs{}, &reply)
+		isUpdating.Lock()
+		if reply.IsMapTask {
+			fmt.Println("get map task: ", reply.TaskIndex)
+		}
+		if !isSuccess {
 			mutex.Unlock()
+			isUpdating.Unlock()
 			break
 		}
 		if reply.TaskIndex == -1 {
 			mutex.Unlock()
+			isUpdating.Unlock()
 			time.Sleep(1 * time.Second)
 			continue
 		}
@@ -59,6 +68,7 @@ func Worker(mapf func(string, string) []KeyValue,
 				Index:     reply.TaskIndex,
 				IsMapTask: true,
 			}, &UpdateStatusReply{})
+			isUpdating.Unlock()
 			mutex.Unlock()
 			DoMapTask(mapf, reply)
 		} else {
@@ -67,6 +77,7 @@ func Worker(mapf func(string, string) []KeyValue,
 				Index:     reply.TaskIndex,
 				IsMapTask: false,
 			}, &UpdateStatusReply{})
+			isUpdating.Unlock()
 			mutex.Unlock()
 			DoReduceTask(reducef, reply)
 		}
@@ -79,24 +90,47 @@ func Worker(mapf func(string, string) []KeyValue,
 
 func DoMapTask(mapf func(string, string) []KeyValue, reply GetTaskReply) {
 	inputFileName := reply.FileName
+	fmt.Println("inputFileName: ", inputFileName)
 	file, _ := os.Open(inputFileName)
-	content := make([]byte, 1000000000)
-	file.Read(content)
+	content, _ := io.ReadAll(file)
 	file.Close()
 	contentStr := string(content)
 	resultKv := mapf(inputFileName, contentStr)
+	var intermediateFiles []*os.File
+	keyFilename := map[string]string{}
 	for _, kv := range resultKv {
 		intermediateFileName := "mr-" + strconv.Itoa(reply.TaskIndex) + "-" + strconv.Itoa(ihash(kv.Key)%reply.NReduce)
-		intermediateFile, _ := os.OpenFile(intermediateFileName, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
-		enc := json.NewEncoder(intermediateFile)
+		var file *os.File
+		if keyFilename[intermediateFileName] != "" {
+			file, _ = os.OpenFile(keyFilename[intermediateFileName], os.O_APPEND|os.O_WRONLY, 0666)
+		} else {
+			file, _ = os.CreateTemp(".", intermediateFileName+"-*")
+			keyFilename[intermediateFileName] = file.Name()
+		}
+		enc := json.NewEncoder(file)
 		enc.Encode(&kv)
-		intermediateFile.Close()
+		intermediateFiles = append(intermediateFiles, file)
+		file.Close()
 	}
+	updateReply := UpdateStatusReply{}
+	isUpdating.Lock()
 	call("Coordinator.UpdateStatus", &UpdateStatusArgs{
 		Status:    DONE,
 		Index:     reply.TaskIndex,
 		IsMapTask: true,
-	}, &UpdateStatusReply{})
+	}, &updateReply)
+	if updateReply.CanUpdate {
+		for _, file := range intermediateFiles {
+			properFileNameRegex, _ := regexp.Compile("^(.*?/mr-[^-]+-[^-]+)")
+			properFileName := properFileNameRegex.FindString(file.Name())
+			os.Rename(file.Name(), properFileName)
+		}
+	} else {
+		for _, file := range intermediateFiles {
+			os.Remove(file.Name())
+		}
+	}
+	isUpdating.Unlock()
 }
 
 func DoReduceTask(reducef func(string, []string) string, reply GetTaskReply) {
@@ -119,6 +153,8 @@ func DoReduceTask(reducef func(string, []string) string, reply GetTaskReply) {
 		kvMap[kv.Key] = append(kvMap[kv.Key], kv.Value)
 	}
 	lastK := ""
+	files := make([]*os.File, 0)
+	fileNames := map[string]string{}
 	for _, kv := range kva {
 		k := kv.Key
 		if lastK == k {
@@ -128,15 +164,38 @@ func DoReduceTask(reducef func(string, []string) string, reply GetTaskReply) {
 		vArr := kvMap[k]
 		result := reducef(k, vArr)
 		fileLine := k + " " + result + "\n"
-		file, _ := os.OpenFile("mr-"+"out-"+strconv.Itoa(reply.TaskIndex), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+		fileName := "mr-" + "out-" + strconv.Itoa(reply.TaskIndex)
+		var file *os.File
+		if fileNames[fileName] != "" {
+			file, _ = os.OpenFile(fileNames[fileName], os.O_APPEND|os.O_WRONLY, 0666)
+		} else {
+			file, _ = os.CreateTemp(".", fileName+"-*")
+			files = append(files, file)
+			fileNames[fileName] = file.Name()
+		}
 		file.Write([]byte(fileLine))
 		file.Close()
 	}
+	updateReply := UpdateStatusReply{}
+	isUpdating.Lock()
 	call("Coordinator.UpdateStatus", &UpdateStatusArgs{
 		Status:    DONE,
 		Index:     reply.TaskIndex,
 		IsMapTask: false,
-	}, &UpdateStatusReply{})
+	}, &updateReply)
+	fmt.Println("reduce task: ", reply.TaskIndex)
+	if updateReply.CanUpdate {
+		for _, file := range files {
+			properFileNameRegex, _ := regexp.Compile("^(.*?/mr-out-[^-]+)")
+			properFileName := properFileNameRegex.FindString(file.Name())
+			os.Rename(file.Name(), properFileName)
+		}
+	} else {
+		for _, file := range files {
+			os.Remove(file.Name())
+		}
+	}
+	isUpdating.Unlock()
 }
 
 // example function to show how to make an RPC call to the coordinator.

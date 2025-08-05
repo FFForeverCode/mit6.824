@@ -39,7 +39,9 @@ type GetTaskReply struct {
 	NReduce   int
 }
 
-type UpdateStatusReply struct{}
+type UpdateStatusReply struct {
+	CanUpdate bool
+}
 
 // Cook up a unique-ish UNIX-domain socket name
 // in /var/tmp, for the coordinator.
