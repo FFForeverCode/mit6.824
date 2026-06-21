@@ -24,6 +24,7 @@ import (
 // (much more than the paper's range of timeouts).
 const RaftElectionTimeout = 1000 * time.Millisecond
 
+
 func TestInitialElection3A(t *testing.T) {
 	servers := 3
 	ts := makeTest(t, servers, true, false)
