@@ -68,7 +68,7 @@ func (rf *Raft) GetState() (int, bool) {
 	var term int
 	var isleader bool
 	// Your code here (3A).
-	
+
 	rf.mu.Lock()
 	term = rf.currentTerm
 	isleader = rf.state == LEADER
@@ -133,70 +133,6 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 }
 
 
-// example RequestVote RPC arguments structure.
-// field names must start with capital letters!
-type RequestVoteArgs struct {
-	// Your data here (3A, 3B).
-	Term int
-	CandidateId int
-	LastLogIndex int
-	LastLogTerm int
-
-}
-
-// example RequestVote RPC reply structure.
-// field names must start with capital letters!
-type RequestVoteReply struct {
-	// Your data here (3A).
-	Term int
-	VoteGranted bool
-}
-
-// example RequestVote RPC handler.
-func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
-	// Your code here (3A, 3B).
-
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
-	if args.Term > rf.currentTerm {
-		rf.state = FOLLOWER 
-		rf.currentTerm = args.Term
-		rf.votedFor = -1
-	}
-	
-
-	term := args.Term
-
-	
-	if term < rf.currentTerm {
-		reply.VoteGranted = false 
-		reply.Term = rf.currentTerm
-	} else {
-
-		if (rf.votedFor < 0 || rf.votedFor == args.CandidateId) &&
-			args.LastLogTerm >= rf.log[len(rf.log)-1].term && 
-			args.LastLogIndex >= len(rf.log) - 1 {
-			
-			
-			rf.votedFor = args.CandidateId
-			rf.state = FOLLOWER
-			rf.leaderHeartBeat = true 
-			
-			reply.VoteGranted = true
-		} else {
-			
-			reply.VoteGranted = false 
-		}
-		
-		reply.Term = term
-		
-	}
-	if !reply.VoteGranted {
-		println(rf.me, "not vote to", args.CandidateId, "because", "rf.votedFor", rf.votedFor, "args.Term", args.Term, "rf.currentTerm", rf.currentTerm, "args.LastLogIndex", args.LastLogIndex, "len(rf.log)-1", len(rf.log) - 1)
-	} else {
-		println(rf.me, "vote to", args.CandidateId, reply.VoteGranted)
-	}
-}
 
 // example code to send a RequestVote RPC to a server.
 // server is the index of the target server in rf.peers[].
@@ -230,32 +166,6 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 	return ok
 }
 
-type AppendEntriesArgs struct {
-	Term int
-}
-
-type AppendEntriesReply struct {
-	Term int 
-	Success bool 
-}
-
-func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
-	rf.mu.Lock()
-	
-	defer rf.mu.Unlock()
-	if args.Term >= rf.currentTerm {
-		rf.leaderHeartBeat = true 
-	}
-	
-	if args.Term > rf.currentTerm { 
-		
-		rf.currentTerm = args.Term
-		rf.state = FOLLOWER 
-		rf.votedFor = -1
-		return
-	}
-	reply.Term = rf.currentTerm
-}
 
 func (rf *Raft) sendAppendEntries(server int, args *AppendEntriesArgs, reply *AppendEntriesReply) bool {
 	ok := rf.peers[server].Call("Raft.AppendEntries", args, reply)
@@ -307,7 +217,7 @@ func (rf *Raft) killed() bool {
 
 func (rf *Raft) ticker() {
 	sleepRandom(rand.Int63() % 300)
-	
+
 	for rf.killed() == false {
 		// Your code here (3A)
 		// Check if a leader election should be started.
@@ -317,102 +227,72 @@ func (rf *Raft) ticker() {
 		}
 
 		if rf.state == CANDIDATE {
+			// electWithUnlock releases the lock during RPCs and re-acquires
+			// it before returning, so it is safe to read state below.
 			votes := electWithUnlock(rf)
-			currTerm := rf.currentTerm
-			
-			if votes > len(rf.peers) / 2 {
-				rf.mu.Lock()
-				if rf.state == CANDIDATE && currTerm == rf.currentTerm{
-    				rf.state = LEADER
-					rf.leaderHeartBeat = false
-				}
-				rf.mu.Unlock()
-
-				isLeader := rf.sendHeartbeat()
-				
-				if isLeader {
-
-					go func(rf *Raft) {
-						for !rf.killed() {
-							
-							
-							isLeader := rf.sendHeartbeat()
-							if !isLeader {
-								break
-							}
-							
-							sleepRandom(40 + (rand.Int63() % 30))
-						}
-					
-					} (rf)
-				}
-
-				 
-			
+			if rf.state == CANDIDATE && votes > len(rf.peers)/2 {
+				rf.state = LEADER
+				rf.leaderHeartBeat = false
+				rf.startLeader()
 			}
-		} else {
-			rf.mu.Unlock()
 		}
-		rf.mu.Lock()
+
 		if rf.state == FOLLOWER {
 			rf.leaderHeartBeat = false
 		}
-		
 		rf.mu.Unlock()
-		
-		
-		sleepRandom(300 + (rand.Int63() % 300))
+
+		sleepRandom(350 + (rand.Int63() % 250))
 	}
 }
 
-func (rf *Raft) sendHeartbeat() bool {
-	doneChan := make(chan bool, len(rf.peers))
-	isLeader := true
+// startLeader launches the heartbeat loop for the current leadership term.
+func (rf *Raft) startLeader() {
+	go func() {
+		for !rf.killed() {
+			rf.mu.Lock()
+			if rf.state != LEADER {
+				rf.mu.Unlock()
+				return
+			}
+			currTerm := rf.currentTerm
+			rf.mu.Unlock()
+
+			rf.sendHeartbeat(currTerm)
+			// Heartbeat interval kept >= 100ms to stay under the tester's
+			// limit of ten heartbeats per second.
+			sleepRandom(110 + (rand.Int63() % 40))
+		}
+	}()
+}
+
+// sendHeartbeat sends one round of heartbeats. It is fire-and-forget: it does
+// not block on slow or disconnected peers, so the heartbeat cadence stays
+// steady even when some peers are unreachable.
+func (rf *Raft) sendHeartbeat(currTerm int) {
 	for peer := range rf.peers {
 		if peer == rf.me {
 			continue
 		}
-
-		rf.mu.Lock()
-		if rf.state != LEADER {
-			isLeader = false
-		}
-		currTerm := rf.currentTerm
-		rf.mu.Unlock()
-		go func(peer int, doneChan chan bool) {		
+		go func(peer int) {
 			reply := &AppendEntriesReply{}
-
-			rf.mu.Lock()
-			if rf.state != LEADER {
-				isLeader = false
-				doneChan <- true
-				rf.mu.Unlock()
+			ok := rf.sendAppendEntries(peer, &AppendEntriesArgs{Term: currTerm}, reply)
+			if !ok {
 				return
 			}
-			rf.mu.Unlock()
-			ok := rf.sendAppendEntries(peer, &AppendEntriesArgs{Term: currTerm}, reply)
-
 			rf.mu.Lock()
-			if reply.Term > rf.currentTerm && ok {
+			defer rf.mu.Unlock()
+			if reply.Term > rf.currentTerm {
 				rf.currentTerm = reply.Term
 				rf.state = FOLLOWER
-				rf.mu.Unlock()
-				doneChan <- true
-				return
-			} 
-			rf.mu.Unlock()
-			doneChan <- true
-		} (peer, doneChan)
+				rf.votedFor = -1
+			}
+		}(peer)
 	}
-	for range (len(rf.peers) - 1) {
-		<- doneChan
-	}
-
-	return isLeader
 }
 
-// around request vote locks may be needed to avoid split brain
-
+// electWithUnlock must be called with rf.mu held. It releases the lock while
+// gathering votes and re-acquires it before returning the vote count.
 func electWithUnlock(rf *Raft) int {
 	votes := 1
 
@@ -438,32 +318,31 @@ func electWithUnlock(rf *Raft) int {
 			LastLogTerm:  lastLogTerm,
 		}
 
-
-		var reply RequestVoteReply
-
-		go func (voteChan chan bool)  {
+		go func(i int) {
+			var reply RequestVoteReply
 			ok := rf.sendRequestVote(i, &arg, &reply)
 
 			rf.mu.Lock()
 			defer rf.mu.Unlock()
-			if !ok || currTerm != rf.currentTerm {
-				voteChan <- false
-			} else if reply.Term > currTerm {
+			if ok && reply.Term > rf.currentTerm {
+				rf.currentTerm = reply.Term
 				rf.state = FOLLOWER
-				voteChan <- false
-			} else if reply.VoteGranted {
-				voteChan <- true
-			} else {
-				voteChan <- false 
+				rf.votedFor = -1
 			}
-		}(voteChan)
+			granted := ok && currTerm == rf.currentTerm && reply.VoteGranted
+			voteChan <- granted
+		}(i)
 	}
-	for range (len(rf.peers) - 1) {
-		if (<- voteChan) { votes++ }
-		if votes > len(rf.peers) / 2 {break}
+	for range len(rf.peers) - 1 {
+		if <-voteChan {
+			votes++
+		}
+		if votes > len(rf.peers)/2 {
+			break
+		}
 	}
 
-
+	rf.mu.Lock()
 	return votes
 }
 
