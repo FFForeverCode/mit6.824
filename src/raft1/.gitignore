@@ -1,0 +1,4 @@
+# Local test harness artifacts
+run_tests.sh
+test_logs/
+*.test

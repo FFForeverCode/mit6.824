@@ -226,16 +226,8 @@ func (rf *Raft) ticker() {
 			rf.state = CANDIDATE
 			currTerm := rf.currentTerm
 			println("TICK-ELECT", time.Now().UnixMilli(), "me", rf.me, "preTerm", currTerm)
-			votes := electWithUnlock(rf)
-			println("TICK-DONE", time.Now().UnixMilli(), "me", rf.me, "term", rf.currentTerm, "votes", votes, "state", rf.state)
-			if rf.state == CANDIDATE && votes > len(rf.peers)/2 {
-				rf.state = LEADER
-				println("BECAME-LEADER", time.Now().UnixMilli(), "me", rf.me, "term", rf.currentTerm)
-				rf.mu.Unlock()
-				rf.startLeader(currTerm)
-			} else {
-				rf.mu.Unlock()
-			}
+			electWithUnlock(rf)
+
 		} else {
 			rf.mu.Unlock()
 		}
@@ -294,7 +286,7 @@ func (rf *Raft) sendHeartbeat(currTerm int) {
 
 // electWithUnlock must be called with rf.mu held. It releases the lock while
 // gathering votes and re-acquires it before returning the vote count.
-func electWithUnlock(rf *Raft) int {
+func electWithUnlock(rf *Raft) {
 	votes := 1
 
 	rf.currentTerm += 1
@@ -306,7 +298,6 @@ func electWithUnlock(rf *Raft) int {
 	rf.mu.Unlock()
 	// ask for votes
 
-	voteChan := make(chan bool, len(rf.peers))
 
 	for i := range rf.peers {
 		if i == rf.me {
@@ -326,35 +317,31 @@ func electWithUnlock(rf *Raft) int {
 
 			rf.mu.Lock()
 			defer rf.mu.Unlock()
+			defer println("TICK-DONE", time.Now().UnixMilli(), "me", rf.me, "term", rf.currentTerm,  "state", rf.state)
+			expired := rf.timeout()
+			if expired {
+				println("ELECT-LOOP-EXIT-TIMEOUT", time.Now().UnixMilli(), "me", rf.me, "term", currTerm, "votes", votes)
+				return
+			}
 			if ok && reply.Term > rf.currentTerm {
 				rf.currentTerm = reply.Term
 				rf.state = FOLLOWER
 				rf.votedFor = -1
+				return
 			}
 			granted := ok && currTerm == rf.currentTerm && reply.VoteGranted
 			println("VOTE-REPLY", time.Now().UnixMilli(), "me", rf.me, "from", i, "ok", ok, "granted", granted, "replyTerm", reply.Term, "argTerm", currTerm, "myTerm", rf.currentTerm, "state", rf.state)
-			voteChan <- granted
+			if granted { votes ++ }
+			if votes > len(rf.peers) / 2 && rf.state == CANDIDATE && !rf.timeout() && rf.currentTerm == currTerm{
+				rf.state = LEADER
+				println("BECAME-LEADER", time.Now().UnixMilli(), "me", rf.me, "term", rf.currentTerm, "votes", votes, "lastVoteFrom", i, "argTerm", currTerm)
+				rf.startLeader(currTerm)
+			}
+
 		}(i)
 	}
-	for range len(rf.peers) - 1 {
-		if <-voteChan {
-			votes++
-		}
-		if votes > len(rf.peers)/2 {
-			break
-		}
-		rf.mu.Lock()
-		expired := rf.timeout()
-		rf.mu.Unlock()
-		if expired {
-			println("ELECT-LOOP-EXIT-TIMEOUT", time.Now().UnixMilli(), "me", rf.me, "term", currTerm, "votes", votes)
-			break
-		}
-	}
-	println("ELECT-LOOP-DONE", time.Now().UnixMilli(), "me", rf.me, "term", currTerm, "votes", votes)
 
-	rf.mu.Lock()
-	return votes
+
 }
 
 // timeout reports whether the election timer has expired.
