@@ -1,5 +1,7 @@
 package raft
 
+import "time"
+
 
 type AppendEntriesArgs struct {
 	Term int
@@ -17,6 +19,7 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	reply.Term = rf.currentTerm
 	// Reject heartbeats from a stale leader.
 	if args.Term < rf.currentTerm {
+		println("AE-REJECT", time.Now().UnixMilli(), "me", rf.me, "leaderTerm", args.Term, "myTerm", rf.currentTerm)
 		reply.Success = false
 		return
 	}
@@ -27,8 +30,10 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 		rf.currentTerm = args.Term
 		rf.votedFor = -1
 	}
+	println("AE-FOLLOWER", time.Now().UnixMilli(), "me", rf.me, "leaderTerm", args.Term, "myTerm", rf.currentTerm, "prevState", rf.state)
 	rf.state = FOLLOWER
-	rf.leaderHeartBeat = true
+	rf.lastHeard = time.Now()
+	rf.resetTimeout()
 	reply.Term = rf.currentTerm
 	reply.Success = true
 }

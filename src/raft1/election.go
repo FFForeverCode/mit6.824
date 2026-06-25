@@ -1,4 +1,7 @@
 package raft
+
+import "time"
+
 // example RequestVote RPC arguments structure.
 // field names must start with capital letters!
 type RequestVoteArgs struct {
@@ -25,35 +28,40 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 	if args.Term > rf.currentTerm {
-		rf.state = FOLLOWER 
+		println("RV-BUMP", time.Now().UnixMilli(), "me", rf.me, "from", args.CandidateId, "newTerm", args.Term, "oldTerm", rf.currentTerm)
+		rf.state = FOLLOWER
 		rf.currentTerm = args.Term
 		rf.votedFor = -1
 	}
-	
+
 
 	term := args.Term
 
-	
+
 	if term < rf.currentTerm {
-		reply.VoteGranted = false 
+		println("RV-REJECT-STALE", time.Now().UnixMilli(), "me", rf.me, "from", args.CandidateId, "argTerm", args.Term, "myTerm", rf.currentTerm)
+		reply.VoteGranted = false
 		reply.Term = rf.currentTerm
 	} else {
 
 		if (rf.votedFor < 0 || rf.votedFor == args.CandidateId) &&
-			args.LastLogTerm >= rf.log[len(rf.log)-1].term && 
+			args.LastLogTerm >= rf.log[len(rf.log)-1].term &&
 			args.LastLogIndex >= len(rf.log) - 1 {
-			
-			
+
+
 			rf.votedFor = args.CandidateId
 			rf.state = FOLLOWER
-			rf.leaderHeartBeat = true 
-			
+			rf.lastHeard = time.Now()
+			rf.resetTimeout()
+
+			println("RV-GRANT", time.Now().UnixMilli(), "me", rf.me, "to", args.CandidateId, "term", rf.currentTerm)
 			reply.VoteGranted = true
 		} else {
-			
-			reply.VoteGranted = false 
+
+			println("RV-REJECT-VOTED", time.Now().UnixMilli(), "me", rf.me, "from", args.CandidateId, "argTerm", args.Term, "myTerm", rf.currentTerm, "votedFor", rf.votedFor)
+			reply.VoteGranted = false
 		}
-		
+
 		reply.Term = rf.currentTerm
 
 	}

@@ -53,7 +53,8 @@ type Raft struct {
 	// leader state
 	// 0 follower, 1 candidate, 2 leader
 	state int 
-	leaderHeartBeat bool
+	electionTimeout time.Duration
+	lastHeard time.Time
 }
 
 type Log struct {
@@ -219,35 +220,33 @@ func (rf *Raft) ticker() {
 	sleepRandom(rand.Int63() % 300)
 
 	for rf.killed() == false {
-		// Your code here (3A)
-		// Check if a leader election should be started.
 		rf.mu.Lock()
-		if rf.state == FOLLOWER && rf.leaderHeartBeat == false {
+		if (rf.state == FOLLOWER || rf.state == CANDIDATE) && rf.timeout() {
+			rf.resetTimeout()
 			rf.state = CANDIDATE
-		}
-
-		if rf.state == CANDIDATE {
-			// electWithUnlock releases the lock during RPCs and re-acquires
-			// it before returning, so it is safe to read state below.
+			currTerm := rf.currentTerm
+			println("TICK-ELECT", time.Now().UnixMilli(), "me", rf.me, "preTerm", currTerm)
 			votes := electWithUnlock(rf)
+			println("TICK-DONE", time.Now().UnixMilli(), "me", rf.me, "term", rf.currentTerm, "votes", votes, "state", rf.state)
 			if rf.state == CANDIDATE && votes > len(rf.peers)/2 {
 				rf.state = LEADER
-				rf.leaderHeartBeat = false
-				rf.startLeader()
+				println("BECAME-LEADER", time.Now().UnixMilli(), "me", rf.me, "term", rf.currentTerm)
+				rf.mu.Unlock()
+				rf.startLeader(currTerm)
+			} else {
+				rf.mu.Unlock()
 			}
+		} else {
+			rf.mu.Unlock()
 		}
-
-		if rf.state == FOLLOWER {
-			rf.leaderHeartBeat = false
-		}
-		rf.mu.Unlock()
-
-		sleepRandom(350 + (rand.Int63() % 250))
+		sleepRandom(20)
 	}
+		
 }
 
+
 // startLeader launches the heartbeat loop for the current leadership term.
-func (rf *Raft) startLeader() {
+func (rf *Raft) startLeader(currTerm int) {
 	go func() {
 		for !rf.killed() {
 			rf.mu.Lock()
@@ -261,10 +260,11 @@ func (rf *Raft) startLeader() {
 			rf.sendHeartbeat(currTerm)
 			// Heartbeat interval kept >= 100ms to stay under the tester's
 			// limit of ten heartbeats per second.
-			sleepRandom(110 + (rand.Int63() % 40))
+			sleepRandom(90 + (rand.Int63() % 30))
 		}
 	}()
 }
+
 
 // sendHeartbeat sends one round of heartbeats. It is fire-and-forget: it does
 // not block on slow or disconnected peers, so the heartbeat cadence stays
@@ -283,6 +283,7 @@ func (rf *Raft) sendHeartbeat(currTerm int) {
 			rf.mu.Lock()
 			defer rf.mu.Unlock()
 			if reply.Term > rf.currentTerm {
+				println("HB-STEPDOWN", time.Now().UnixMilli(), "me", rf.me, "from", peer, "replyTerm", reply.Term, "myTerm", rf.currentTerm)
 				rf.currentTerm = reply.Term
 				rf.state = FOLLOWER
 				rf.votedFor = -1
@@ -301,6 +302,7 @@ func electWithUnlock(rf *Raft) int {
 	currTerm := rf.currentTerm
 	lastLogIndex := len(rf.log) - 1
 	lastLogTerm := rf.log[len(rf.log)-1].term
+	println("ELECT-START", time.Now().UnixMilli(), "me", rf.me, "newTerm", currTerm)
 	rf.mu.Unlock()
 	// ask for votes
 
@@ -330,6 +332,7 @@ func electWithUnlock(rf *Raft) int {
 				rf.votedFor = -1
 			}
 			granted := ok && currTerm == rf.currentTerm && reply.VoteGranted
+			println("VOTE-REPLY", time.Now().UnixMilli(), "me", rf.me, "from", i, "ok", ok, "granted", granted, "replyTerm", reply.Term, "argTerm", currTerm, "myTerm", rf.currentTerm, "state", rf.state)
 			voteChan <- granted
 		}(i)
 	}
@@ -340,15 +343,33 @@ func electWithUnlock(rf *Raft) int {
 		if votes > len(rf.peers)/2 {
 			break
 		}
+		rf.mu.Lock()
+		expired := rf.timeout()
+		rf.mu.Unlock()
+		if expired {
+			println("ELECT-LOOP-EXIT-TIMEOUT", time.Now().UnixMilli(), "me", rf.me, "term", currTerm, "votes", votes)
+			break
+		}
 	}
+	println("ELECT-LOOP-DONE", time.Now().UnixMilli(), "me", rf.me, "term", currTerm, "votes", votes)
 
 	rf.mu.Lock()
 	return votes
 }
 
-func sleepRandom(ms int64) {
-	time.Sleep(time.Duration(ms) * time.Millisecond)
+// timeout reports whether the election timer has expired.
+// Caller must hold rf.mu.
+func (rf *Raft) timeout() bool {
+	return time.Since(rf.lastHeard) > rf.electionTimeout
 }
+
+// resetTimeout restarts the election timer with a fresh randomized duration.
+// Caller must hold rf.mu.
+func (rf *Raft) resetTimeout() {
+	rf.electionTimeout = time.Duration(rand.Int63()%400+200) * time.Millisecond
+	rf.lastHeard = time.Now()
+}
+
 
 // the service or tester wants to create a Raft server. the ports
 // of all the Raft servers (including this one) are in peers[]. this
@@ -380,6 +401,8 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.matchIndex = make([]int, len(peers))
 	lastLogIndex := len(rf.log) - 1
 
+	rf.resetTimeout()
+	rf.lastHeard = time.Unix(0, 0)
 	for i := range peers {
 		rf.nextIndex[i] = lastLogIndex + 1
 		rf.matchIndex[i] = 0
